@@ -1,0 +1,14 @@
+.Dialog-overlay {
+    background: rgba(#121212, 0.2);
+    display: grid;
+    place-items: center;
+    /* 保证弹窗盖在欢迎页（z-index: 500）等覆盖层之上 */
+    z-index: 1000;
+}
+
+.Dialog {
+    margin: 15px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 4px;
+}

@@ -1,0 +1,43 @@
+@use '../../styles/variables.scss' as *;
+
+.drawnix {
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--island-border-color);
+
+    &__spacer {
+      flex: 1;
+    }
+
+    &__button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--lg-button-size, 32px);
+      height: var(--lg-button-size, 32px);
+      padding: 0;
+      border: none;
+      border-radius: var(--border-radius-sm, 4px);
+      background: transparent;
+      color: var(--color-on-surface);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--color-surface-primary-container);
+      }
+
+      &.sidebar-footer__button--active {
+        background-color: var(--color-surface-primary-container);
+        color: var(--color-primary);
+      }
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+}

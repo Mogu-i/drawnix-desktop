@@ -1,0 +1,83 @@
+.create-file-dialog {
+  background: var(--island-bg-color, #fff);
+  color: var(--color-on-surface, #1a1a1a);
+  border-radius: 8px;
+  padding: 20px;
+  width: 320px;
+  max-width: calc(100vw - 30px);
+
+  &__title {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+
+  &__input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--island-border-color, #e0e0e0);
+    border-radius: var(--border-radius-sm, 4px);
+    background-color: var(--island-bg-color, #fff);
+    color: var(--color-on-surface, #1a1a1a);
+    outline: none;
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+  }
+
+  &__group {
+    margin-top: 12px;
+  }
+
+  &__group-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-on-surface-muted, #666);
+    margin-bottom: 6px;
+  }
+
+  &__select {
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  &__button {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+
+    &--cancel {
+      background: var(--color-surface-secondary-container, #f5f5f5);
+      color: var(--color-on-surface, #1a1a1a);
+
+      &:hover {
+        background: var(--color-surface-primary-container, #e8e8e8);
+      }
+    }
+
+    &--ok {
+      background: var(--color-primary, #4a90e2);
+      color: #fff;
+
+      &:hover:not(:disabled) {
+        opacity: 0.9;
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+    }
+  }
+}

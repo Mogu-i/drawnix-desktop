@@ -1,0 +1,108 @@
+.drawnix-card__bg {
+  fill: #ffffff;
+  stroke: #d0d3d9;
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.12));
+}
+
+.drawnix-card__host {
+  width: 100%;
+  height: 100%;
+}
+
+.drawnix-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 14px;
+  color: #1a1a1a;
+  font-family: inherit;
+
+  &__title {
+    pointer-events: auto;
+    cursor: text;
+    outline: none;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 22px;
+    min-height: 22px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eceef1;
+    word-break: break-word;
+
+    &:empty::before {
+      content: '标题';
+      color: #b6bac2;
+    }
+  }
+
+  &__content {
+    pointer-events: auto;
+    cursor: text;
+    outline: none;
+    flex: 1;
+    overflow-y: auto;
+    line-height: 20px;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    &:empty::before {
+      content: '输入内容…';
+      color: #b6bac2;
+    }
+  }
+
+  &__image-wrap {
+    position: relative;
+    pointer-events: auto;
+    margin-top: 8px;
+  }
+
+  &__image {
+    display: block;
+    max-width: 100%;
+    max-height: 120px;
+    border-radius: 4px;
+  }
+
+  &__remove-image {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  &__footer {
+    pointer-events: auto;
+    margin-top: 8px;
+  }
+
+  &__insert-image {
+    pointer-events: auto;
+    cursor: pointer;
+    border: 1px solid #d0d3d9;
+    background: #f7f8fa;
+    color: #4a4f5a;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+
+    &:hover {
+      background: #eef0f3;
+    }
+  }
+}
