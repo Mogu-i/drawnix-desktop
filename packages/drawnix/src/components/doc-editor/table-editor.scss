@@ -32,6 +32,49 @@
       cursor: not-allowed;
       opacity: 0.5;
     }
+
+    // 对齐等图标按钮
+    &--icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 6px;
+    }
+
+    // 当前生效的对齐方式高亮
+    &--active {
+      border-color: var(--color-primary, #4a90e2);
+      color: var(--color-primary, #4a90e2);
+    }
+  }
+
+  &__align-icon {
+    display: block;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  // 加粗/下划线/删除线按钮的字形图标
+  &__effect-icon {
+    display: block;
+    width: 16px;
+    font-size: 13px;
+    line-height: 16px;
+    text-align: center;
+
+    &--bold {
+      font-weight: 700;
+    }
+
+    &--underline {
+      text-decoration: underline;
+    }
+
+    &--strikethrough {
+      text-decoration: line-through;
+    }
   }
 
   &__tool-item {
@@ -83,22 +126,76 @@
     padding: 16px;
   }
 
+  &__table-wrap {
+    position: relative;
+
+    // 拖拽调整行高列宽时禁止选中文字，并显示对应方向的光标
+    &--resizing {
+      user-select: none;
+    }
+  }
+
   &__table {
     border-collapse: collapse;
     table-layout: fixed;
-    min-width: 100%;
+    // 默认字号；单元格设置了 fontSize 时由内联样式覆盖，
+    // 内部文字/编辑框均从这里继承，避免写死字号导致设置不生效
+    font-size: 14px;
 
     td {
       border: 1px solid #b4b4b4;
       padding: 0;
-      vertical-align: top;
       background: transparent;
     }
   }
 
+  &__resize-handle {
+    position: absolute;
+    z-index: 2;
+
+    &--col {
+      top: 0;
+      width: 8px;
+      cursor: col-resize;
+    }
+
+    &--row {
+      left: 0;
+      height: 8px;
+      cursor: row-resize;
+    }
+
+    // 悬停/拖拽时显示高亮指示线
+    &::after {
+      content: '';
+      position: absolute;
+      background: transparent;
+      transition: background 0.15s;
+    }
+
+    &--col::after {
+      top: 0;
+      bottom: 0;
+      left: 3px;
+      width: 2px;
+    }
+
+    &--row::after {
+      left: 0;
+      right: 0;
+      top: 3px;
+      height: 2px;
+    }
+
+    &:hover::after,
+    &--active::after {
+      background: var(--color-primary, #4a90e2);
+    }
+  }
+
   &__cell {
-    min-width: 96px;
-    height: 32px;
+    // 作为编辑框的定位基准，使 textarea 能绝对定位铺满单元格
+    position: relative;
     cursor: cell;
     user-select: none;
 
@@ -111,13 +208,18 @@
   &__cell-text {
     display: block;
     padding: 6px 8px;
-    font-size: 14px;
+    // 字号/颜色/对齐/加粗等均从单元格继承，保证样式设置正确生效
     line-height: 1.5;
     word-break: break-word;
     white-space: pre-wrap;
   }
 
   &__cell-editor {
+    // 绝对定位铺满单元格，行高/列宽拖拽变化时实时跟随，
+    // 避免 td 内百分比高度解析失败导致编辑框不同步
+    position: absolute;
+    top: 0;
+    left: 0;
     display: block;
     width: 100%;
     height: 100%;
@@ -125,11 +227,13 @@
     resize: none;
     border: none;
     padding: 6px 8px;
+    // 字号/颜色/对齐均从单元格继承，与展示态保持一致
     font-family: inherit;
-    font-size: 14px;
+    font-size: inherit;
     line-height: 1.5;
+    text-align: inherit;
     background: var(--island-bg-color, #fff);
-    color: var(--color-on-surface, #1a1a1a);
+    color: inherit;
     outline: 2px solid var(--color-primary, #4a90e2);
     outline-offset: -2px;
 

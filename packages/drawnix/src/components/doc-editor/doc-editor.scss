@@ -65,28 +65,4 @@
     font-size: 14px;
     color: var(--color-on-surface-muted, #888);
   }
-
-  &__markdown-input {
-    flex: 1;
-    min-height: 0;
-    resize: none;
-    border: none;
-    border-radius: 0;
-    padding: 16px 20px;
-    font-family: ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.7;
-    background: var(--island-bg-color, #fff);
-    color: var(--color-on-surface, #1a1a1a);
-    outline: none;
-
-    &:hover,
-    &:focus {
-      border: none;
-    }
-
-    &:disabled {
-      opacity: 0.6;
-    }
-  }
 }

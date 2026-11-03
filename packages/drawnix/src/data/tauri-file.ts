@@ -130,10 +130,7 @@ export type TauriDirOrder = {
 };
 
 export type TauriOrderMap = Record<string, TauriDirOrder>;
-export const createTauriFolder = (
-  parent: string | null,
-  name: string
-): Promise<void> => {
+export const createTauriFolder = (parent: string | null, name: string): Promise<void> => {
   return invokeTauri<void>('create_folder', { parent, name });
 };
 
@@ -156,10 +153,7 @@ export const moveTauriFileToDir = (
 };
 
 /** 移动分组到目标目录；targetDir 为 null 表示移到根目录 */
-export const moveTauriFolderToDir = (
-  path: string,
-  targetDir: string | null
-): Promise<void> => {
+export const moveTauriFolderToDir = (path: string, targetDir: string | null): Promise<void> => {
   return invokeTauri<void>('move_folder_to_dir', { path, targetDir });
 };
 
@@ -298,11 +292,25 @@ export type TableCellBorder = {
   color?: string;
 };
 
+export type TableCellAlign = 'left' | 'center' | 'right';
+
+export type TableCellVAlign = 'top' | 'middle' | 'bottom';
+
 export type TableCellStyle = {
   fontSize?: number;
   color?: string;
   bg?: string;
   border?: TableCellBorder | null;
+  /** 单元格文字水平对齐 */
+  align?: TableCellAlign;
+  /** 单元格文字垂直对齐 */
+  valign?: TableCellVAlign;
+  /** 加粗 */
+  bold?: boolean;
+  /** 下划线 */
+  underline?: boolean;
+  /** 删除线 */
+  strikethrough?: boolean;
 };
 
 export type TableCellData = TableCellStyle & {
@@ -321,6 +329,8 @@ export type TableFileData = {
   cols: number;
   cells: TableCellData[][];
   colWidths?: number[];
+  /** 每行行高（px），未设置的行回退到默认行高 */
+  rowHeights?: number[];
 };
 
 export const TABLE_FILE_VERSION = 1;
@@ -333,9 +343,7 @@ export const buildEmptyTableContent = (rows = 3, cols = 3): string => {
     version: TABLE_FILE_VERSION,
     rows,
     cols,
-    cells: Array.from({ length: rows }, () =>
-      Array.from({ length: cols }, buildEmptyTableCell)
-    ),
+    cells: Array.from({ length: rows }, () => Array.from({ length: cols }, buildEmptyTableCell)),
   };
   return JSON.stringify(data, null, 2);
 };

@@ -8,12 +8,120 @@ import {
   readTauriFile,
 } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
+import type { Translations } from '../../i18n/types';
 import './table-editor.scss';
 import { useDocAutoSave } from './use-doc-auto-save';
 
 const DEFAULT_BORDER_COLOR = '#b4b4b4';
 
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
+
+const DEFAULT_COL_WIDTH = 96;
+
+const DEFAULT_ROW_HEIGHT = 32;
+
+const MIN_COL_WIDTH = 40;
+
+const MIN_ROW_HEIGHT = 24;
+
+/** 取整表生效的列宽，未自定义的列回退到默认宽度 */
+const getColWidths = (data: TableFileData): number[] =>
+  Array.from({ length: data.cols }, (_, i) => data.colWidths?.[i] ?? DEFAULT_COL_WIDTH);
+
+/** 取整表生效的行高，未自定义的行回退到默认高度 */
+const getRowHeights = (data: TableFileData): number[] =>
+  Array.from({ length: data.rows }, (_, i) => data.rowHeights?.[i] ?? DEFAULT_ROW_HEIGHT);
+
+/** 对齐图标线段坐标（16x16 视图框），h 为水平三横线，v 为垂直三竖线 */
+const ALIGN_ICON_LINES: Record<string, [number, number][]> = {
+  'h-left': [
+    [2, 10],
+    [2, 14],
+    [2, 8],
+  ],
+  'h-center': [
+    [3, 13],
+    [5, 11],
+    [2, 14],
+  ],
+  'h-right': [
+    [6, 14],
+    [2, 14],
+    [8, 14],
+  ],
+  'v-top': [
+    [2, 10],
+    [2, 14],
+    [2, 8],
+  ],
+  'v-middle': [
+    [3, 13],
+    [5, 11],
+    [2, 14],
+  ],
+  'v-bottom': [
+    [6, 14],
+    [2, 14],
+    [8, 14],
+  ],
+};
+
+/** 字体效果的翻译键 */
+const EFFECT_LABEL_KEYS = {
+  bold: 'table.bold',
+  underline: 'table.underline',
+  strikethrough: 'table.strikethrough',
+} as const;
+
+/** 文字效果（加粗/下划线/删除线）样式；textarea 需显式应用，不能依赖继承 */
+const buildCellTextStyle = (cell: TableCellData): React.CSSProperties => {
+  const style: React.CSSProperties = {};
+  if (cell.bold) {
+    style.fontWeight = 700;
+  }
+  const decorations = [
+    cell.underline ? 'underline' : '',
+    cell.strikethrough ? 'line-through' : '',
+  ].filter(Boolean);
+  if (decorations.length > 0) {
+    style.textDecoration = decorations.join(' ');
+  }
+  return style;
+};
+
+/** 对齐方式的翻译键，避免动态拼接导致类型不安全 */
+const ALIGN_LABEL_KEYS: Record<AlignKind, keyof Translations> = {
+  left: 'table.alignLeft',
+  center: 'table.alignCenter',
+  right: 'table.alignRight',
+  top: 'table.alignTop',
+  middle: 'table.alignMiddle',
+  bottom: 'table.alignBottom',
+};
+
+type AlignKind = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+const AlignIcon = ({ variant }: { variant: string }) => {
+  const vertical = variant.startsWith('v-');
+  const lines = ALIGN_ICON_LINES[variant] ?? [];
+  return (
+    <svg
+      className="table-editor__align-icon"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+    >
+      {lines.map(([a, b], i) =>
+        vertical ? (
+          <line key={i} x1={4 + i * 4} y1={a} x2={4 + i * 4} y2={b} />
+        ) : (
+          <line key={i} x1={a} y1={4 + i * 4} x2={b} y2={4 + i * 4} />
+        )
+      )}
+    </svg>
+  );
+};
 
 type CellPos = { row: number; col: number };
 
@@ -96,6 +204,19 @@ export const TableEditor = ({ path }: { path: string }) => {
   const [editing, setEditing] = useState<CellPos | null>(null);
   const mouseDownRef = useRef(false);
   const dataRef = useRef<TableFileData | null>(null);
+  // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
+  const resizeRef = useRef<{
+    type: 'col' | 'row';
+    index: number;
+    startPos: number;
+    startSize: number;
+  } | null>(null);
+  const previewRef = useRef<{ colWidths: number[]; rowHeights: number[] } | null>(null);
+  const [resizing, setResizing] = useState(false);
+  const [resizePreview, setResizePreview] = useState<{
+    colWidths: number[];
+    rowHeights: number[];
+  } | null>(null);
 
   const serialize = useCallback(
     () => (dataRef.current ? JSON.stringify(dataRef.current, null, 2) : null),
@@ -171,6 +292,7 @@ export const TableEditor = ({ path }: { path: string }) => {
       insertAt = master.row + (master.cell.rowSpan ?? 1);
     }
     next.cells.splice(insertAt, 0, Array.from({ length: next.cols }, buildEmptyTableCell));
+    next.rowHeights?.splice(insertAt, 0, DEFAULT_ROW_HEIGHT);
     next.rows += 1;
     commit(next);
   };
@@ -189,6 +311,7 @@ export const TableEditor = ({ path }: { path: string }) => {
       }
     }
     next.cells.splice(refRow, 1);
+    next.rowHeights?.splice(refRow, 1);
     next.rows -= 1;
     setSel(null);
     setEditing(null);
@@ -210,6 +333,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     next.cells.forEach((row) => {
       row.splice(insertAt, 0, buildEmptyTableCell());
     });
+    next.colWidths?.splice(insertAt, 0, DEFAULT_COL_WIDTH);
     next.cols += 1;
     commit(next);
   };
@@ -229,6 +353,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     next.cells.forEach((row) => {
       row.splice(refCol, 1);
     });
+    next.colWidths?.splice(refCol, 1);
     next.cols -= 1;
     setSel(null);
     setEditing(null);
@@ -350,6 +475,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     commit(next);
   };
 
+  // 单击仅选中，双击才进入编辑（onDoubleClick），避免误触
   const handleCellMouseDown = (row: number, col: number, event: React.MouseEvent) => {
     if (event.shiftKey && sel) {
       setSel({ anchor: sel.anchor, focus: { row, col } });
@@ -376,6 +502,75 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, []);
 
+  // ----- 行高列宽调整 -----
+
+  const startResize = (type: 'col' | 'row', index: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!data) {
+      return;
+    }
+    const sizes = resizePreview ?? {
+      colWidths: getColWidths(data),
+      rowHeights: getRowHeights(data),
+    };
+    resizeRef.current = {
+      type,
+      index,
+      startPos: type === 'col' ? event.clientX : event.clientY,
+      startSize: type === 'col' ? sizes.colWidths[index] : sizes.rowHeights[index],
+    };
+    previewRef.current = sizes;
+    setResizing(true);
+  };
+
+  useEffect(() => {
+    if (!resizing) {
+      return;
+    }
+    const handleMove = (event: MouseEvent) => {
+      const context = resizeRef.current;
+      const base = previewRef.current;
+      if (!context || !base) {
+        return;
+      }
+      const delta = (context.type === 'col' ? event.clientX : event.clientY) - context.startPos;
+      const min = context.type === 'col' ? MIN_COL_WIDTH : MIN_ROW_HEIGHT;
+      const size = Math.max(min, context.startSize + delta);
+      // 拖拽过程中只更新预览尺寸，不写入数据
+      const next = { colWidths: base.colWidths, rowHeights: base.rowHeights };
+      if (context.type === 'col') {
+        next.colWidths = [...base.colWidths];
+        next.colWidths[context.index] = size;
+      } else {
+        next.rowHeights = [...base.rowHeights];
+        next.rowHeights[context.index] = size;
+      }
+      previewRef.current = next;
+      setResizePreview(next);
+    };
+    const handleUp = () => {
+      const preview = previewRef.current;
+      if (preview && dataRef.current) {
+        // 松开后才提交尺寸并触发保存
+        const next = structuredClone(dataRef.current);
+        next.colWidths = preview.colWidths;
+        next.rowHeights = preview.rowHeights;
+        commit(next);
+      }
+      resizeRef.current = null;
+      previewRef.current = null;
+      setResizing(false);
+      setResizePreview(null);
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [resizing, commit]);
+
   const buildCellStyle = (cell: TableCellData): React.CSSProperties => {
     const style: React.CSSProperties = {};
     if (cell.fontSize) {
@@ -389,10 +584,19 @@ export const TableEditor = ({ path }: { path: string }) => {
     }
     const border = cell.border;
     const borderColor = border?.color || DEFAULT_BORDER_COLOR;
-    style.borderTop = border?.top === false ? 'none' : border?.top ? `1px solid ${borderColor}` : undefined;
-    style.borderRight = border?.right === false ? 'none' : border?.right ? `1px solid ${borderColor}` : undefined;
-    style.borderBottom = border?.bottom === false ? 'none' : border?.bottom ? `1px solid ${borderColor}` : undefined;
-    style.borderLeft = border?.left === false ? 'none' : border?.left ? `1px solid ${borderColor}` : undefined;
+    // 对齐方式未设置时保持默认的左对齐/顶端对齐
+    style.textAlign = cell.align ?? 'left';
+    style.verticalAlign = cell.valign ?? 'top';
+    // 加粗/下划线/删除线；未设置时保持默认（不加粗、无装饰）
+    Object.assign(style, buildCellTextStyle(cell));
+    style.borderTop =
+      border?.top === false ? 'none' : border?.top ? `1px solid ${borderColor}` : undefined;
+    style.borderRight =
+      border?.right === false ? 'none' : border?.right ? `1px solid ${borderColor}` : undefined;
+    style.borderBottom =
+      border?.bottom === false ? 'none' : border?.bottom ? `1px solid ${borderColor}` : undefined;
+    style.borderLeft =
+      border?.left === false ? 'none' : border?.left ? `1px solid ${borderColor}` : undefined;
     return style;
   };
 
@@ -403,6 +607,26 @@ export const TableEditor = ({ path }: { path: string }) => {
   if (!data) {
     return null;
   }
+
+  // 拖拽调整过程中使用预览尺寸，否则使用已保存的尺寸
+  const colWidths = resizePreview?.colWidths ?? getColWidths(data);
+  const rowHeights = resizePreview?.rowHeights ?? getRowHeights(data);
+  const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
+  const tableHeight = rowHeights.reduce((sum, height) => sum + height, 0);
+  const colOffsets = [0];
+  colWidths.forEach((width) => colOffsets.push(colOffsets[colOffsets.length - 1] + width));
+  const rowOffsets = [0];
+  rowHeights.forEach((height) => rowOffsets.push(rowOffsets[rowOffsets.length - 1] + height));
+
+  // 当前选区首个单元格的样式，用于工具栏按钮高亮
+  const firstCell = data.cells[rect?.r1 ?? 0]?.[rect?.c1 ?? 0];
+  const currentAlign = firstCell?.align ?? 'left';
+  const currentValign = firstCell?.valign ?? 'top';
+  const currentEffects = {
+    bold: firstCell?.bold ?? false,
+    underline: firstCell?.underline ?? false,
+    strikethrough: firstCell?.strikethrough ?? false,
+  };
 
   return (
     <div className="table-editor">
@@ -509,63 +733,155 @@ export const TableEditor = ({ path }: { path: string }) => {
             onChange={(event) => applyStyle({ bg: event.target.value })}
           />
         </label>
+        <span className="table-editor__separator" />
+        {(
+          [
+            ['bold', 'B'],
+            ['underline', 'U'],
+            ['strikethrough', 'S'],
+          ] as const
+        ).map(([effect, label]) => (
+          <button
+            key={effect}
+            type="button"
+            title={t(EFFECT_LABEL_KEYS[effect])}
+            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
+              'table-editor__tool-button--active': currentEffects[effect],
+            })}
+            onClick={() =>
+              applyStyle({ [effect]: !currentEffects[effect] } as Partial<TableCellData>)
+            }
+          >
+            <span className={`table-editor__effect-icon table-editor__effect-icon--${effect}`}>
+              {label}
+            </span>
+          </button>
+        ))}
+        {(['left', 'center', 'right'] as const).map((align) => (
+          <button
+            key={align}
+            type="button"
+            title={t(ALIGN_LABEL_KEYS[align])}
+            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
+              'table-editor__tool-button--active': currentAlign === align,
+            })}
+            onClick={() => applyStyle({ align })}
+          >
+            <AlignIcon variant={`h-${align}`} />
+          </button>
+        ))}
+        {(['top', 'middle', 'bottom'] as const).map((valign) => (
+          <button
+            key={valign}
+            type="button"
+            title={t(ALIGN_LABEL_KEYS[valign])}
+            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
+              'table-editor__tool-button--active': currentValign === valign,
+            })}
+            onClick={() => applyStyle({ valign })}
+          >
+            <AlignIcon variant={`v-${valign}`} />
+          </button>
+        ))}
         <span className="table-editor__hint">{t('table.selectionHint')}</span>
       </div>
       <div className="table-editor__canvas">
-        <table className="table-editor__table" cellPadding={0}>
-          <tbody>
-            {data.cells.map((row, r) => (
-              <tr key={r}>
-                {row.map((cell, c) => {
-                  if (cell.hidden) {
-                    return null;
-                  }
-                  const selected =
-                    !!rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
-                  return (
-                    <td
-                      key={c}
-                      rowSpan={cell.rowSpan ?? 1}
-                      colSpan={cell.colSpan ?? 1}
-                      style={buildCellStyle(cell)}
-                      className={classNames('table-editor__cell', {
-                        'table-editor__cell--selected': selected,
-                      })}
-                      onMouseDown={(event) => handleCellMouseDown(r, c, event)}
-                      onMouseEnter={() => handleCellMouseEnter(r, c)}
-                      onDoubleClick={() => setEditing({ row: r, col: c })}
-                    >
-                      {editing && editing.row === r && editing.col === c ? (
-                        <textarea
-                          className="table-editor__cell-editor"
-                          defaultValue={cell.text}
-                          autoFocus
-                          onFocus={(event) => event.target.select()}
-                          onBlur={(event) => {
-                            setCellText(r, c, event.target.value);
-                            setEditing(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault();
-                              (event.target as HTMLTextAreaElement).blur();
-                            } else if (event.key === 'Escape') {
+        <div
+          className={classNames('table-editor__table-wrap', {
+            'table-editor__table-wrap--resizing': resizing,
+          })}
+          style={
+            resizing
+              ? { cursor: resizeRef.current?.type === 'row' ? 'row-resize' : 'col-resize' }
+              : undefined
+          }
+        >
+          <table className="table-editor__table" cellPadding={0}>
+            <colgroup>
+              {colWidths.map((width, c) => (
+                <col key={c} style={{ width: `${width}px` }} />
+              ))}
+            </colgroup>
+            <tbody>
+              {data.cells.map((row, r) => (
+                <tr key={r} style={{ height: `${rowHeights[r]}px` }}>
+                  {row.map((cell, c) => {
+                    if (cell.hidden) {
+                      return null;
+                    }
+                    const selected =
+                      !!rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
+                    return (
+                      <td
+                        key={c}
+                        rowSpan={cell.rowSpan ?? 1}
+                        colSpan={cell.colSpan ?? 1}
+                        style={buildCellStyle(cell)}
+                        className={classNames('table-editor__cell', {
+                          'table-editor__cell--selected': selected,
+                        })}
+                        onMouseDown={(event) => handleCellMouseDown(r, c, event)}
+                        onMouseEnter={() => handleCellMouseEnter(r, c)}
+                        onDoubleClick={() => setEditing({ row: r, col: c })}
+                      >
+                        {editing && editing.row === r && editing.col === c ? (
+                          <textarea
+                            className="table-editor__cell-editor"
+                            defaultValue={cell.text}
+                            style={buildCellTextStyle(cell)}
+                            autoFocus
+                            // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
+                            onMouseDown={(event) => event.stopPropagation()}
+                            // 进入编辑时光标定位到内容末尾，方便直接续写
+                            onFocus={(event) => {
+                              const editor = event.currentTarget;
+                              editor.setSelectionRange(editor.value.length, editor.value.length);
+                            }}
+                            onBlur={(event) => {
+                              setCellText(r, c, event.target.value);
                               setEditing(null);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="table-editor__cell-text">
-                          {cell.text || '\u00A0'}
-                        </span>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                            }}
+                            onKeyDown={(event) => {
+                              // 回车提交并退出编辑（Shift+回车换行）；
+                              // Escape 同样走 blur 提交，避免误按丢失输入
+                              if (
+                                (event.key === 'Enter' && !event.shiftKey) ||
+                                event.key === 'Escape'
+                              ) {
+                                event.preventDefault();
+                                (event.target as HTMLTextAreaElement).blur();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="table-editor__cell-text">{cell.text || '\u00A0'}</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {/* 列边界拖拽手柄：覆盖在每列右侧边界上，实时预览、松开提交 */}
+          {colWidths.map((_, c) => (
+            <div
+              key={`col-${c}`}
+              className="table-editor__resize-handle table-editor__resize-handle--col"
+              style={{ left: colOffsets[c + 1] - 4, height: tableHeight }}
+              onMouseDown={(event) => startResize('col', c, event)}
+            />
+          ))}
+          {/* 行边界拖拽手柄：覆盖在每行下侧边界上 */}
+          {rowHeights.map((_, r) => (
+            <div
+              key={`row-${r}`}
+              className="table-editor__resize-handle table-editor__resize-handle--row"
+              style={{ top: rowOffsets[r + 1] - 4, width: tableWidth }}
+              onMouseDown={(event) => startResize('row', r, event)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -178,9 +178,41 @@ export interface Translations {
   'table.borderNone': string;
   'table.borderOuter': string;
   'table.selectionHint': string;
+  'table.alignLeft': string;
+  'table.alignCenter': string;
+  'table.alignRight': string;
+  'table.alignTop': string;
+  'table.alignMiddle': string;
+  'table.alignBottom': string;
+  'table.bold': string;
+  'table.underline': string;
+  'table.strikethrough': string;
 
   // Markdown editor
   'markdown.placeholder': string;
+  'markdown.mode.label': string;
+  'markdown.mode.code': string;
+  'markdown.mode.split': string;
+  'markdown.mode.preview': string;
+  'markdown.toolbar.bold': string;
+  'markdown.toolbar.italic': string;
+  'markdown.toolbar.strikethrough': string;
+  'markdown.toolbar.heading1': string;
+  'markdown.toolbar.heading2': string;
+  'markdown.toolbar.heading3': string;
+  'markdown.toolbar.unorderedList': string;
+  'markdown.toolbar.orderedList': string;
+  'markdown.toolbar.taskList': string;
+  'markdown.toolbar.quote': string;
+  'markdown.toolbar.inlineCode': string;
+  'markdown.toolbar.codeBlock': string;
+  'markdown.toolbar.link': string;
+  'markdown.toolbar.image': string;
+  'markdown.toolbar.table': string;
+  'markdown.toolbar.horizontalRule': string;
+  'markdown.tableTemplate': string;
+  'markdown.linkPlaceholder': string;
+  'markdown.imagePlaceholder': string;
 
   // Doc editor overlay
   'docEditor.close': string;
