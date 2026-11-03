@@ -136,7 +136,7 @@ const enTranslations: Translations = {
   'filePanel.title': 'Files',
   'filePanel.newFile': 'New',
   'filePanel.newFilePlaceholder': 'New file name…',
-  'filePanel.empty': 'No .drawnix files yet',
+  'filePanel.empty': 'No files yet',
   'filePanel.rename': 'Rename',
   'filePanel.trash': 'Trash',
   'filePanel.trashEmpty': 'Trash is empty',
@@ -151,6 +151,33 @@ const enTranslations: Translations = {
   'filePanel.delete': 'Delete',
   'filePanel.move': 'Move to…',
   'filePanel.emptyTrash': 'Empty trash',
+
+  // New file dialog: file types
+  'filePanel.fileType': 'File type',
+  'filePanel.fileType.drawnix': 'Board',
+  'filePanel.fileType.md': 'Markdown',
+  'filePanel.fileType.table': 'Table',
+  'filePanel.tableRows': 'Rows',
+  'filePanel.tableCols': 'Columns',
+
+  // Table editor
+  'table.insertRow': 'Insert row',
+  'table.deleteRow': 'Delete row',
+  'table.insertCol': 'Insert column',
+  'table.deleteCol': 'Delete column',
+  'table.merge': 'Merge cells',
+  'table.unmerge': 'Unmerge',
+  'table.border': 'Border',
+  'table.borderAll': 'All borders',
+  'table.borderNone': 'No border',
+  'table.borderOuter': 'Outer border',
+  'table.selectionHint': 'Click to select, drag or Shift+click for multi-select, double-click to edit',
+
+  // Markdown editor
+  'markdown.placeholder': 'Type Markdown here…',
+
+  // Doc editor overlay
+  'docEditor.close': 'Close',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Delete file',
@@ -178,7 +205,7 @@ const enTranslations: Translations = {
   'settings.dataDir': 'Data storage path',
   'settings.dataDirBrowse': 'Browse…',
   'settings.dataDirHint':
-    'After changing the path, existing .drawnix files are migrated to the new location automatically (original files are kept as backup).',
+    'After changing the path, existing files (boards/Markdown/tables) are migrated to the new location automatically (original files are kept as backup).',
   'settings.dataDirMigrating': 'Migrating…',
   'settings.dataDirMigratedFiles': 'files migrated to the new path',
   'settings.dataDirSamePath': 'New path is the same as the current one',

@@ -138,7 +138,7 @@ const viTranslations: Translations = {
   'filePanel.title': 'Tệp',
   'filePanel.newFile': 'Mới',
   'filePanel.newFilePlaceholder': 'Tên tệp mới…',
-  'filePanel.empty': 'Chưa có tệp .drawnix nào',
+  'filePanel.empty': 'Chưa có tệp nào',
   'filePanel.rename': 'Đổi tên',
   'filePanel.trash': 'Thùng rác',
   'filePanel.trashEmpty': 'Thùng rác trống',
@@ -153,6 +153,33 @@ const viTranslations: Translations = {
   'filePanel.delete': 'Xóa',
   'filePanel.move': 'Chuyển đến…',
   'filePanel.emptyTrash': 'Dọn thùng rác',
+
+  // New file dialog: file types
+  'filePanel.fileType': 'Loại tệp',
+  'filePanel.fileType.drawnix': 'Bảng vẽ',
+  'filePanel.fileType.md': 'Markdown',
+  'filePanel.fileType.table': 'Bảng',
+  'filePanel.tableRows': 'Số hàng',
+  'filePanel.tableCols': 'Số cột',
+
+  // Table editor
+  'table.insertRow': 'Chèn hàng',
+  'table.deleteRow': 'Xóa hàng',
+  'table.insertCol': 'Chèn cột',
+  'table.deleteCol': 'Xóa cột',
+  'table.merge': 'Gộp ô',
+  'table.unmerge': 'Bỏ gộp',
+  'table.border': 'Đường viền',
+  'table.borderAll': 'Viền toàn bộ',
+  'table.borderNone': 'Không viền',
+  'table.borderOuter': 'Viền ngoài',
+  'table.selectionHint': 'Nhấp để chọn, kéo hoặc Shift+nhấp để chọn nhiều, nhấp đúp để chỉnh sửa',
+
+  // Markdown editor
+  'markdown.placeholder': 'Nhập Markdown tại đây…',
+
+  // Doc editor overlay
+  'docEditor.close': 'Đóng',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Xóa tệp',
@@ -180,7 +207,7 @@ const viTranslations: Translations = {
   'settings.dataDir': 'Đường dẫn lưu dữ liệu',
   'settings.dataDirBrowse': 'Duyệt…',
   'settings.dataDirHint':
-    'Sau khi thay đổi đường dẫn, các tệp .drawnix hiện có sẽ được tự động chuyển sang đường dẫn mới (tệp gốc được giữ lại làm bản sao lưu).',
+    'Sau khi thay đổi đường dẫn, các tệp hiện có (bảng vẽ/Markdown/bảng) sẽ được tự động chuyển sang đường dẫn mới (tệp gốc được giữ lại làm bản sao lưu).',
   'settings.dataDirMigrating': 'Đang chuyển…',
   'settings.dataDirMigratedFiles': 'tệp đã được chuyển sang đường dẫn mới',
   'settings.dataDirSamePath': 'Đường dẫn mới trùng với đường dẫn hiện tại',

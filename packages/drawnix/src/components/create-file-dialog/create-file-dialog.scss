@@ -43,6 +43,43 @@
     width: 100%;
   }
 
+  &__table-size {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  &__table-size-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-on-surface-muted, #666);
+
+    span {
+      white-space: nowrap;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 14px;
+      padding: 6px 8px;
+      border: 1px solid var(--island-border-color, #e0e0e0);
+      border-radius: var(--border-radius-sm, 4px);
+      background-color: var(--island-bg-color, #fff);
+      color: var(--color-on-surface, #1a1a1a);
+      outline: none;
+
+      &:focus {
+        border-color: var(--color-primary);
+      }
+    }
+  }
+
   &__actions {
     display: flex;
     justify-content: flex-end;

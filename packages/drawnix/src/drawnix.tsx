@@ -49,9 +49,11 @@ import { Toast, useToast } from './components/toast/toast';
 import { withCard, migrateLegacyBoardData } from './plugins/card/with-card';
 import { TauriFilePanel } from './components/tauri-file-panel/tauri-file-panel';
 import { WelcomePage } from './components/welcome-page/welcome-page';
+import { DocEditor } from './components/doc-editor/doc-editor';
 import {
   isTauriEnvironment,
   markTauriFileDirty,
+  useTauriFileState,
 } from './data/tauri-file';
 
 export type DrawnixProps = {
@@ -237,6 +239,10 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 当前打开的是 Markdown/表格文件时，用文档编辑器覆盖层替代白板编辑区
+  const { currentFile, fileType: currentFileType } = useTauriFileState();
+  const isDocOpen = !!currentFile && isTauriEnvironment() && currentFileType !== 'drawnix';
+
   // Normalize board data coming from any host before it reaches the board:
   // persisted data may still contain card elements saved before the card
   // plugin became geometry-based, which would otherwise crash the plugin
@@ -293,16 +299,27 @@ export const Drawnix: React.FC<DrawnixProps> = ({
               >
                 {tutorial && board && !isTauriEnvironment() && <Tutorial />}
               </Board>
-              <AppToolbar></AppToolbar>
-              <CreationToolbar></CreationToolbar>
-              <ZoomToolbar></ZoomToolbar>
-              <ThemeToolbar></ThemeToolbar>
-              <PopupToolbar></PopupToolbar>
-              <LinkPopup></LinkPopup>
-              <ClosePencilToolbar></ClosePencilToolbar>
+              {isDocOpen && currentFile && (
+                <DocEditor
+                  key={currentFile}
+                  path={currentFile}
+                  fileType={currentFileType as 'md' | 'table'}
+                ></DocEditor>
+              )}
+              {!isDocOpen && (
+                <>
+                  <AppToolbar></AppToolbar>
+                  <CreationToolbar></CreationToolbar>
+                  <ZoomToolbar></ZoomToolbar>
+                  <ThemeToolbar></ThemeToolbar>
+                  <PopupToolbar></PopupToolbar>
+                  <LinkPopup></LinkPopup>
+                  <ClosePencilToolbar></ClosePencilToolbar>
+                  <WelcomePage></WelcomePage>
+                </>
+              )}
               <TTDDialog container={containerRef.current}></TTDDialog>
               <CleanConfirm container={containerRef.current}></CleanConfirm>
-              <WelcomePage></WelcomePage>
             </div>
             <Toast toast={toast} container={containerRef.current}></Toast>
           </Wrapper>

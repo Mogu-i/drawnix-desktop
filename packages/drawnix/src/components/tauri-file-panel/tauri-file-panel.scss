@@ -187,6 +187,9 @@
     }
 
     .tauri-file-panel__item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 13px;
       text-align: left;
       padding: 6px 8px;
@@ -198,6 +201,24 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+
+      .tauri-file-panel__item-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tauri-file-panel__item-ext {
+        flex: 0 0 auto;
+        font-size: 10px;
+        line-height: 1;
+        padding: 2px 5px;
+        border-radius: 999px;
+        background-color: var(--color-surface-secondary-container);
+        color: var(--color-on-surface-muted, #888);
+        font-weight: 500;
+      }
 
       &.tauri-file-panel__item--dragging {
         opacity: 0.4;

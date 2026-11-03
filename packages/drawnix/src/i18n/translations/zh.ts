@@ -138,7 +138,7 @@ const zhTranslations: Translations = {
   'filePanel.title': '文件',
   'filePanel.newFile': '新建',
   'filePanel.newFilePlaceholder': '输入文件名…',
-  'filePanel.empty': '暂无 .drawnix 文件',
+  'filePanel.empty': '暂无文件',
   'filePanel.rename': '重命名',
   'filePanel.trash': '回收站',
   'filePanel.trashEmpty': '回收站为空',
@@ -153,6 +153,33 @@ const zhTranslations: Translations = {
   'filePanel.delete': '删除',
   'filePanel.move': '移动到…',
   'filePanel.emptyTrash': '清空回收站',
+
+  // New file dialog: file types
+  'filePanel.fileType': '文件类型',
+  'filePanel.fileType.drawnix': '白板',
+  'filePanel.fileType.md': 'Markdown',
+  'filePanel.fileType.table': '表格',
+  'filePanel.tableRows': '行数',
+  'filePanel.tableCols': '列数',
+
+  // Table editor
+  'table.insertRow': '插入行',
+  'table.deleteRow': '删除行',
+  'table.insertCol': '插入列',
+  'table.deleteCol': '删除列',
+  'table.merge': '合并单元格',
+  'table.unmerge': '取消合并',
+  'table.border': '边框',
+  'table.borderAll': '全部边框',
+  'table.borderNone': '无边框',
+  'table.borderOuter': '外边框',
+  'table.selectionHint': '单击选择，拖动或 Shift+单击多选，双击编辑单元格',
+
+  // Markdown editor
+  'markdown.placeholder': '在此输入 Markdown 内容…',
+
+  // Doc editor overlay
+  'docEditor.close': '关闭',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': '删除文件',
@@ -178,7 +205,7 @@ const zhTranslations: Translations = {
   'settings.dataDir': '数据存储路径',
   'settings.dataDirBrowse': '浏览…',
   'settings.dataDirHint':
-    '修改路径后，现有 .drawnix 文件会自动迁移到新路径（原文件保留作为备份）。',
+    '修改路径后，现有文件（白板/Markdown/表格）会自动迁移到新路径（原文件保留作为备份）。',
   'settings.dataDirMigrating': '迁移中…',
   'settings.dataDirMigratedFiles': '个文件已迁移至新路径',
   'settings.dataDirSamePath': '新路径与当前路径相同',

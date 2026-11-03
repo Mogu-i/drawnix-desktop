@@ -137,7 +137,7 @@ const arTranslations: Translations = {
   'filePanel.title': 'الملفات',
   'filePanel.newFile': 'جديد',
   'filePanel.newFilePlaceholder': 'اسم الملف الجديد…',
-  'filePanel.empty': 'لا توجد ملفات .drawnix',
+  'filePanel.empty': 'لا توجد ملفات',
   'filePanel.rename': 'إعادة تسمية',
   'filePanel.trash': 'المحذوفات',
   'filePanel.trashEmpty': 'المحذوفات فارغة',
@@ -152,6 +152,33 @@ const arTranslations: Translations = {
   'filePanel.delete': 'حذف',
   'filePanel.move': 'نقل إلى…',
   'filePanel.emptyTrash': 'تفريغ المحذوفات',
+
+  // New file dialog: file types
+  'filePanel.fileType': 'نوع الملف',
+  'filePanel.fileType.drawnix': 'سبورة',
+  'filePanel.fileType.md': 'Markdown',
+  'filePanel.fileType.table': 'جدول',
+  'filePanel.tableRows': 'عدد الصفوف',
+  'filePanel.tableCols': 'عدد الأعمدة',
+
+  // Table editor
+  'table.insertRow': 'إدراج صف',
+  'table.deleteRow': 'حذف صف',
+  'table.insertCol': 'إدراج عمود',
+  'table.deleteCol': 'حذف عمود',
+  'table.merge': 'دمج الخلايا',
+  'table.unmerge': 'إلغاء الدمج',
+  'table.border': 'الحدود',
+  'table.borderAll': 'كل الحدود',
+  'table.borderNone': 'بدون حدود',
+  'table.borderOuter': 'الحدود الخارجية',
+  'table.selectionHint': 'انقر للتحديد، اسحب أو Shift+انقر لتحديد متعدد، انقر نقرًا مزدوجًا للتحرير',
+
+  // Markdown editor
+  'markdown.placeholder': 'اكتب Markdown هنا…',
+
+  // Doc editor overlay
+  'docEditor.close': 'إغلاق',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'حذف الملف',
@@ -179,7 +206,7 @@ const arTranslations: Translations = {
   'settings.dataDir': 'مسار تخزين البيانات',
   'settings.dataDirBrowse': 'استعراض…',
   'settings.dataDirHint':
-    'بعد تغيير المسار، سيتم نقل ملفات .drawnix الحالية تلقائيًا إلى المسار الجديد (تبقى الملفات الأصلية كنسخة احتياطية).',
+    'بعد تغيير المسار، سيتم نقل الملفات الحالية (السبورات/Markdown/الجداول) تلقائيًا إلى المسار الجديد (تبقى الملفات الأصلية كنسخة احتياطية).',
   'settings.dataDirMigrating': 'جارٍ النقل…',
   'settings.dataDirMigratedFiles': 'ملفًا تم نقلها إلى المسار الجديد',
   'settings.dataDirSamePath': 'المسار الجديد مطابق للمسار الحالي',

@@ -139,7 +139,7 @@ const ruTranslations: Translations = {
   'filePanel.title': 'Файлы',
   'filePanel.newFile': 'Новый',
   'filePanel.newFilePlaceholder': 'Имя нового файла…',
-  'filePanel.empty': 'Нет файлов .drawnix',
+  'filePanel.empty': 'Нет файлов',
   'filePanel.rename': 'Переименовать',
   'filePanel.trash': 'Корзина',
   'filePanel.trashEmpty': 'Корзина пуста',
@@ -154,6 +154,33 @@ const ruTranslations: Translations = {
   'filePanel.delete': 'Удалить',
   'filePanel.move': 'Переместить в…',
   'filePanel.emptyTrash': 'Очистить корзину',
+
+  // New file dialog: file types
+  'filePanel.fileType': 'Тип файла',
+  'filePanel.fileType.drawnix': 'Доска',
+  'filePanel.fileType.md': 'Markdown',
+  'filePanel.fileType.table': 'Таблица',
+  'filePanel.tableRows': 'Строки',
+  'filePanel.tableCols': 'Столбцы',
+
+  // Table editor
+  'table.insertRow': 'Вставить строку',
+  'table.deleteRow': 'Удалить строку',
+  'table.insertCol': 'Вставить столбец',
+  'table.deleteCol': 'Удалить столбец',
+  'table.merge': 'Объединить ячейки',
+  'table.unmerge': 'Разъединить',
+  'table.border': 'Граница',
+  'table.borderAll': 'Все границы',
+  'table.borderNone': 'Без границ',
+  'table.borderOuter': 'Внешняя граница',
+  'table.selectionHint': 'Клик — выбор, перетаскивание или Shift+клик — несколько ячеек, двойной клик — редактирование',
+
+  // Markdown editor
+  'markdown.placeholder': 'Введите Markdown здесь…',
+
+  // Doc editor overlay
+  'docEditor.close': 'Закрыть',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Удалить файл',
@@ -181,7 +208,7 @@ const ruTranslations: Translations = {
   'settings.dataDir': 'Путь хранения данных',
   'settings.dataDirBrowse': 'Обзор…',
   'settings.dataDirHint':
-    'После изменения пути существующие файлы .drawnix будут автоматически перенесены в новое расположение (оригиналы сохраняются как резервная копия).',
+    'После изменения пути существующие файлы (доски/Markdown/таблицы) будут автоматически перенесены в новое расположение (оригиналы сохраняются как резервная копия).',
   'settings.dataDirMigrating': 'Перенос…',
   'settings.dataDirMigratedFiles': 'файлов перенесено в новый путь',
   'settings.dataDirSamePath': 'Новый путь совпадает с текущим',

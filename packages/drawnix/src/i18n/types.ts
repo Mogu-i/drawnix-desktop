@@ -158,6 +158,33 @@ export interface Translations {
   'filePanel.move': string;
   'filePanel.emptyTrash': string;
 
+  // New file dialog: file types
+  'filePanel.fileType': string;
+  'filePanel.fileType.drawnix': string;
+  'filePanel.fileType.md': string;
+  'filePanel.fileType.table': string;
+  'filePanel.tableRows': string;
+  'filePanel.tableCols': string;
+
+  // Table editor
+  'table.insertRow': string;
+  'table.deleteRow': string;
+  'table.insertCol': string;
+  'table.deleteCol': string;
+  'table.merge': string;
+  'table.unmerge': string;
+  'table.border': string;
+  'table.borderAll': string;
+  'table.borderNone': string;
+  'table.borderOuter': string;
+  'table.selectionHint': string;
+
+  // Markdown editor
+  'markdown.placeholder': string;
+
+  // Doc editor overlay
+  'docEditor.close': string;
+
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': string;
   'deleteConfirm.description': string;

@@ -9,6 +9,8 @@ export type TauriTreeFileEntry = {
   path: string;
   modifiedAt: number;
   createdAt: number;
+  /** 文件类型（扩展名）：drawnix / md / table */
+  ext: string;
 };
 
 export type TauriTreeDirEntry = {
@@ -27,21 +29,33 @@ export type TauriTreeResult = {
 export type TauriFileState = {
   /** 当前打开的 Tauri 文件相对路径（不含扩展名），null 表示未打开任何文件 */
   currentFile: string | null;
+  /** 当前文件的类型（扩展名），决定主内容区渲染白板还是文档编辑器 */
+  fileType: TauriFileType;
   /** 当前文件是否有未保存的修改 */
   dirty: boolean;
+};
+
+/** 受支持的文件类型：白板 / Markdown / 表格 */
+export type TauriFileType = 'drawnix' | 'md' | 'table';
+
+const DEFAULT_FILE_TYPE: TauriFileType = 'drawnix';
+
+/** 新建文件对话框选项（表格类型可指定初始行列数） */
+export type CreateTauriFileOptions = {
+  rows?: number;
+  cols?: number;
 };
 
 export const isTauriEnvironment = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 };
 
-const DRAWNIX_FILE_EXTENSION = '.drawnix';
-
 export const normalizeTauriFileName = (rawName: string) => {
   const name = rawName
     .trim()
     .replace(/[/\\]/g, '-')
-    .replace(new RegExp(`\\${DRAWNIX_FILE_EXTENSION}$`, 'i'), '');
+    // 用户粘贴带扩展名的文件名时剥掉受支持的扩展名
+    .replace(/\.(drawnix|md|table)$/i, '');
   return name;
 };
 
@@ -54,21 +68,35 @@ export const listTauriTree = (): Promise<TauriTreeResult> => {
   return invokeTauri<TauriTreeResult>('list_tree');
 };
 
-export const readTauriFile = (path: string): Promise<string> => {
-  return invokeTauri<string>('read_drawnix_file', { path });
+export const readTauriFile = (
+  path: string,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
+): Promise<string> => {
+  return invokeTauri<string>('read_drawnix_file', { path, ext: fileType });
 };
 
-export const writeTauriFile = (path: string, content: string): Promise<void> => {
-  return invokeTauri<void>('write_drawnix_file', { path, content });
+export const writeTauriFile = (
+  path: string,
+  content: string,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
+): Promise<void> => {
+  return invokeTauri<void>('write_drawnix_file', { path, content, ext: fileType });
 };
 
 /** 重命名文件（保持在原目录内） */
-export const renameTauriFile = (path: string, newName: string): Promise<void> => {
-  return invokeTauri<void>('rename_drawnix_file', { path, newName });
+export const renameTauriFile = (
+  path: string,
+  newName: string,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
+): Promise<void> => {
+  return invokeTauri<void>('rename_drawnix_file', { path, newName, ext: fileType });
 };
 
-export const deleteTauriFile = (path: string): Promise<void> => {
-  return invokeTauri<void>('delete_drawnix_file', { path });
+export const deleteTauriFile = (
+  path: string,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
+): Promise<void> => {
+  return invokeTauri<void>('delete_drawnix_file', { path, ext: fileType });
 };
 
 export type TauriTrashEntry = {
@@ -76,6 +104,7 @@ export type TauriTrashEntry = {
   /** 删除前的原始路径 */
   path: string;
   deletedAt: number;
+  ext: string;
 };
 export const listTauriTrashFiles = (): Promise<TauriTrashEntry[]> => {
   return invokeTauri<TauriTrashEntry[]>('list_trash_files');
@@ -120,9 +149,10 @@ export const deleteTauriFolder = (path: string): Promise<void> => {
 /** 移动文件到目标目录；targetDir 为 null 表示移到根目录 */
 export const moveTauriFileToDir = (
   path: string,
-  targetDir: string | null
+  targetDir: string | null,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
 ): Promise<void> => {
-  return invokeTauri<void>('move_file_to_dir', { path, targetDir });
+  return invokeTauri<void>('move_file_to_dir', { path, targetDir, ext: fileType });
 };
 
 /** 移动分组到目标目录；targetDir 为 null 表示移到根目录 */
@@ -189,6 +219,7 @@ export const notifyTauriFilesChanged = () => {
 
 let state: TauriFileState = {
   currentFile: null,
+  fileType: DEFAULT_FILE_TYPE,
   dirty: false,
 };
 
@@ -222,9 +253,12 @@ export const useTauriFileState = (): TauriFileState => {
 
 export const getTauriCurrentFile = (): string | null => state.currentFile;
 
-export const setCurrentTauriFile = (name: string | null) => {
+export const setCurrentTauriFile = (
+  name: string | null,
+  fileType: TauriFileType = DEFAULT_FILE_TYPE
+) => {
   suppressDirtyUntil = Date.now() + 500;
-  setState({ currentFile: name, dirty: false });
+  setState({ currentFile: name, fileType, dirty: false });
 };
 
 export const markTauriFileDirty = () => {
@@ -252,6 +286,68 @@ export const buildEmptyDrawnixContent = (): string => {
   );
 };
 
+/** Markdown 文件初始内容：一行标题占位 */
+export const buildEmptyMarkdownContent = (): string => '';
+
+/** 表格文件数据结构（.table） */
+export type TableCellBorder = {
+  top?: boolean;
+  right?: boolean;
+  bottom?: boolean;
+  left?: boolean;
+  color?: string;
+};
+
+export type TableCellStyle = {
+  fontSize?: number;
+  color?: string;
+  bg?: string;
+  border?: TableCellBorder | null;
+};
+
+export type TableCellData = TableCellStyle & {
+  text: string;
+  /** 合并单元格时主单元格的跨行/跨列数 */
+  rowSpan?: number;
+  colSpan?: number;
+  /** 被合并覆盖的隐藏单元格 */
+  hidden?: boolean;
+};
+
+export type TableFileData = {
+  type: 'drawnix-table';
+  version: number;
+  rows: number;
+  cols: number;
+  cells: TableCellData[][];
+  colWidths?: number[];
+};
+
+export const TABLE_FILE_VERSION = 1;
+
+export const buildEmptyTableCell = (): TableCellData => ({ text: '' });
+
+export const buildEmptyTableContent = (rows = 3, cols = 3): string => {
+  const data: TableFileData = {
+    type: 'drawnix-table',
+    version: TABLE_FILE_VERSION,
+    rows,
+    cols,
+    cells: Array.from({ length: rows }, () =>
+      Array.from({ length: cols }, buildEmptyTableCell)
+    ),
+  };
+  return JSON.stringify(data, null, 2);
+};
+
+export const parseTableFileContent = (content: string): TableFileData => {
+  const data = JSON.parse(content) as TableFileData;
+  if (!data || data.type !== 'drawnix-table' || !Array.isArray(data.cells)) {
+    throw new Error('invalid table file');
+  }
+  return data;
+};
+
 export const parseTauriFileContent = (
   content: string
 ): { elements: unknown[]; viewport?: any; theme?: any } => {
@@ -267,8 +363,21 @@ export const saveToTauriFile = async (board: PlaitBoard, path?: string): Promise
   if (!filePath) {
     throw new Error('no tauri file opened');
   }
+  // 当前打开的是 Markdown/表格文件时，画板内容与其无关，
+  // 只清除脏标记，避免把画板 JSON 写入文档文件导致内容损坏
+  if (state.fileType !== 'drawnix') {
+    suppressDirtyUntil = Date.now() + 500;
+    setState({ dirty: false });
+    return filePath;
+  }
   await writeTauriFile(filePath, serializeAsJSON(board));
   suppressDirtyUntil = Date.now() + 500;
   setState({ dirty: false });
   return filePath;
+};
+
+/** 文档编辑器（Markdown/表格）保存完成后清除脏标记 */
+export const clearTauriFileDirty = () => {
+  suppressDirtyUntil = Date.now() + 500;
+  setState({ dirty: false });
 };
