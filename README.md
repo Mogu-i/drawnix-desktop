@@ -1,8 +1,8 @@
 <p align="center">
   <picture style="width: 320px">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h.svg?raw=true" />
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h_dark.svg?raw=true" />
-    <img src="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h.svg?raw=true" width="360" alt="Drawnix logo and name" />
+    <source media="(prefers-color-scheme: light)" srcset="apps/web/public/logo/logo.svg" />
+    <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/logo/logo.svg" />
+    <img src="apps/web/public/logo/logo.svg" width="360" alt="Drawnix logo and name" />
   </picture>
 </p>
 <div align="center">
@@ -12,29 +12,6 @@
   </h2>
 </div>
 
-<div align="center">
-  <figure>
-    <a target="_blank" rel="noopener">
-      <img src="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/product_showcase/case-2.png" alt="Product showcase" width="80%" />
-    </a>
-    <figcaption>
-      <p align="center">
-        All in one 白板，思维导图、流程图、自由画等
-      </p>
-    </figcaption>
-  </figure>
-  <a href="https://hellogithub.com/repository/plait-board/drawnix" target="_blank">
-    <picture style="width: 250">
-      <source media="(prefers-color-scheme: light)" srcset="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=neutral" />
-      <source media="(prefers-color-scheme: dark)" srcset="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=dark" />
-      <img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54"/>
-    </picture>
-  </a>
-
-  <br />
-
-  <a href="https://trendshift.io/repositories/13979" target="_blank"><img src="https://trendshift.io/api/badge/repositories/13979" alt="plait-board%2Fdrawnix | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</div>
 
 [*English README*](README_en.md)
 
