@@ -251,6 +251,10 @@ export const setCurrentTauriFile = (
   name: string | null,
   fileType: TauriFileType = DEFAULT_FILE_TYPE
 ) => {
+  // 打开其他文件时丢弃未完成的 DocEditor 会话，避免关闭时恢复过期路径
+  if (docEditorSession && name !== docEditorSession.docPath) {
+    docEditorSession = null;
+  }
   suppressDirtyUntil = Date.now() + 500;
   setState({ currentFile: name, fileType, dirty: false });
 };
@@ -406,4 +410,42 @@ export const saveToTauriFile = async (board: PlaitBoard, path?: string): Promise
 export const clearTauriFileDirty = () => {
   suppressDirtyUntil = Date.now() + 500;
   setState({ dirty: false });
+};
+
+// ---------------------------------------------------------------------------
+// DocEditor 会话：从白板（如双击文件引用卡片）进入文档编辑器时，
+// 记录进入前的当前白板文件，关闭编辑器后恢复白板上下文
+// ---------------------------------------------------------------------------
+
+type DocEditorSession = {
+  /** 打开的文档相对路径 */
+  docPath: string;
+  /** 进入编辑器前的当前文件，null 表示之前未打开任何文件 */
+  returnFile: { path: string; fileType: TauriFileType } | null;
+};
+
+let docEditorSession: DocEditorSession | null = null;
+
+/** 打开 Markdown/表格文件的文档编辑器，并记录关闭后需要恢复的文件 */
+export const openTauriDocEditor = (path: string, fileType: 'md' | 'table') => {
+  const current = state.currentFile;
+  docEditorSession = {
+    docPath: path,
+    returnFile:
+      current && current !== path
+        ? { path: current, fileType: state.fileType }
+        : null,
+  };
+  setCurrentTauriFile(path, fileType);
+};
+
+/** 关闭文档编辑器；若是从白板进入则恢复之前的白板文件上下文 */
+export const closeTauriDocEditor = () => {
+  const session = docEditorSession;
+  docEditorSession = null;
+  if (session?.returnFile) {
+    setCurrentTauriFile(session.returnFile.path, session.returnFile.fileType);
+  } else {
+    setCurrentTauriFile(null);
+  }
 };

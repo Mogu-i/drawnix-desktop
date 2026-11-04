@@ -129,6 +129,11 @@
   &__table-wrap {
     position: relative;
 
+    // 作为键盘导航的焦点容器，聚焦时不显示浏览器默认轮廓
+    &:focus {
+      outline: none;
+    }
+
     // 拖拽调整行高列宽时禁止选中文字，并显示对应方向的光标
     &--resizing {
       user-select: none;

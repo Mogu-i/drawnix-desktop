@@ -12,6 +12,9 @@ const viTranslations: Translations = {
   'toolbar.extraTools': 'Công cụ mở rộng',
   'toolbar.card': 'Thẻ',
   'card.insertImage': 'Chèn hình ảnh',
+  'card.fileRef.loading': 'Đang tải…',
+  'card.fileRef.missing': 'Tệp không tồn tại hoặc đã bị di chuyển/xóa',
+  'card.fileRef.openHint': 'Nhấp đúp để chỉnh sửa',
 
   'toolbar.pen': 'Bút vẽ — P',
   'toolbar.eraser': 'Tẩy — E',
@@ -174,7 +177,7 @@ const viTranslations: Translations = {
   'table.borderNone': 'Không viền',
   'table.borderOuter': 'Viền ngoài',
   'table.selectionHint':
-    'Nhấp để chọn, kéo hoặc Shift+nhấp để chọn nhiều, nhấp đúp để chỉnh sửa, kéo mép bảng để điều chỉnh kích thước',
+    'Nhấp để chọn, kéo hoặc Shift+nhấp để chọn nhiều, nhấp đúp hoặc Enter để chỉnh sửa, kéo mép bảng để điều chỉnh kích thước; Tab/mũi tên để di chuyển giữa các ô',
   'table.alignLeft': 'Căn trái',
   'table.alignCenter': 'Căn giữa',
   'table.alignRight': 'Căn phải',

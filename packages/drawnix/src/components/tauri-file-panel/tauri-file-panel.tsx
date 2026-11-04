@@ -34,6 +34,7 @@ import {
   moveTauriFileToDir,
   moveTauriFolderToDir,
   normalizeTauriFileName,
+  notifyTauriFilesChanged,
   parseTauriFileContent,
   readTauriFile,
   renameTauriFile,
@@ -56,6 +57,7 @@ import { useI18n } from '../../i18n';
 import { CreateFileDialog } from '../create-file-dialog/create-file-dialog';
 import { MoveEntryDialog } from '../move-entry-dialog/move-entry-dialog';
 import { SidebarFooter } from '../sidebar-footer/sidebar-footer';
+import { syncFileRefCardPaths } from '../../plugins/card/transforms';
 import './tauri-file-panel.scss';
 
 type PanelView = 'files' | 'trash';
@@ -262,6 +264,7 @@ export const TauriFilePanel = () => {
         setCurrentTauriFile(path);
         clearAndLoad([]);
       }
+      notifyTauriFilesChanged();
       refreshTree();
     } catch (error) {
       console.error('Failed to create file:', error);
@@ -337,6 +340,8 @@ export const TauriFilePanel = () => {
       }
       refreshTree();
       refreshTrash();
+      // 广播变更：白板中的引用卡片重新读取后进入“文件不存在”状态
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to delete file:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -363,6 +368,8 @@ export const TauriFilePanel = () => {
       await deleteTauriFolder(path);
       refreshTree();
       refreshTrash();
+      // 广播变更：分组内被引用的文件卡片重新读取后进入“文件不存在”状态
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to delete folder:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -378,19 +385,24 @@ export const TauriFilePanel = () => {
     }
     try {
       if (target.kind === 'file') {
+        const newPath = joinPath(targetDir, lastSeg(target.path));
         // 移动当前打开的文档时屏蔽旧路径的自动保存，避免回写重建旧文件
         if (currentFile === target.path) {
           suppressTauriFileSave(target.path);
         }
         await moveTauriFileToDir(target.path, targetDir, asFileType(target.ext));
+        // 同步白板中引用卡片的路径并广播刷新
+        syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
+        notifyTauriFilesChanged();
         if (currentFile === target.path) {
-          setCurrentTauriFile(
-            joinPath(targetDir, lastSeg(target.path)),
-            currentFileType
-          );
+          setCurrentTauriFile(newPath, currentFileType);
         }
       } else {
+        const newPath = joinPath(targetDir, lastSeg(target.path));
         await moveTauriFolderToDir(target.path, targetDir);
+        // 分组路径变化，同步其下所有引用文件的路径前缀
+        syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
+        notifyTauriFilesChanged();
       }
       refreshTree();
     } catch (error) {
@@ -405,6 +417,7 @@ export const TauriFilePanel = () => {
     try {
       await emptyTauriTrash();
       refreshTrash();
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to empty drawnix trash:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -416,6 +429,8 @@ export const TauriFilePanel = () => {
       await restoreTauriFile(trashFile);
       refreshTree();
       refreshTrash();
+      // 广播变更：被恢复文件的引用卡片重新读取到内容
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to restore drawnix file:', error);
       showErrorToast(t('toast.tauriFile.restoreFailed'));
@@ -463,6 +478,11 @@ export const TauriFilePanel = () => {
     }
     try {
       await renameTauriFolder(dirPath, name);
+      // 同步分组路径前缀下所有引用卡片并广播刷新
+      syncFileRefCardPaths(board, [
+        { from: dirPath, to: joinPath(parentOf(dirPath), name) },
+      ]);
+      notifyTauriFilesChanged();
       refreshTree();
     } catch (error) {
       console.error('Failed to rename folder:', error);
@@ -486,6 +506,9 @@ export const TauriFilePanel = () => {
         suppressTauriFileSave(oldPath);
       }
       await renameTauriFile(oldPath, newName, asFileType(ext));
+      // 同步白板中引用卡片的路径并广播刷新
+      syncFileRefCardPaths(board, [{ from: oldPath, to: newPath }]);
+      notifyTauriFilesChanged();
       if (currentFile === oldPath) {
         setCurrentTauriFile(newPath, currentFileType);
       }
@@ -546,7 +569,13 @@ export const TauriFilePanel = () => {
       return;
     }
     moveTauriFileToDir(path, targetDir, asFileType(ext))
-      .then(refreshTree)
+      .then(() => {
+        syncFileRefCardPaths(board, [
+          { from: path, to: joinPath(targetDir, lastSeg(path)) },
+        ]);
+        notifyTauriFilesChanged();
+        refreshTree();
+      })
       .catch((error) => {
         console.error('Failed to move file:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));
@@ -559,7 +588,13 @@ export const TauriFilePanel = () => {
       return;
     }
     moveTauriFolderToDir(path, targetDir)
-      .then(refreshTree)
+      .then(() => {
+        syncFileRefCardPaths(board, [
+          { from: path, to: joinPath(targetDir, lastSeg(path)) },
+        ]);
+        notifyTauriFilesChanged();
+        refreshTree();
+      })
       .catch((error) => {
         console.error('Failed to move folder:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));

@@ -16,6 +16,9 @@ export interface Translations {
   'toolbar.extraTools': string;
   'toolbar.card': string;
   'card.insertImage': string;
+  'card.fileRef.loading': string;
+  'card.fileRef.missing': string;
+  'card.fileRef.openHint': string;
 
   'toolbar.pen': string;
   'toolbar.eraser': string;

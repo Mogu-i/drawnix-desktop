@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "白板",
+        "title": "思画",
         "width": 1200,
         "height": 700,
         "minWidth": 800,

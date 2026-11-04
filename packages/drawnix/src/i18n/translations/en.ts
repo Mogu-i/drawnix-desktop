@@ -12,6 +12,9 @@ const enTranslations: Translations = {
   'toolbar.extraTools': 'Extra Tools',
   'toolbar.card': 'Card',
   'card.insertImage': 'Insert Image',
+  'card.fileRef.loading': 'Loading…',
+  'card.fileRef.missing': 'File not found or has been moved/deleted',
+  'card.fileRef.openHint': 'Double-click to edit',
 
   'toolbar.pen': 'Pen — P',
   'toolbar.eraser': 'Eraser — E',
@@ -172,7 +175,7 @@ const enTranslations: Translations = {
   'table.borderNone': 'No border',
   'table.borderOuter': 'Outer border',
   'table.selectionHint':
-    'Click to select, drag or Shift+click for multi-select, double-click to edit, drag table edges to resize rows and columns',
+    'Click to select, drag or Shift+click for multi-select, double-click or Enter to edit, drag table edges to resize rows and columns; Tab/arrow keys to navigate cells',
   'table.alignLeft': 'Align left',
   'table.alignCenter': 'Align center',
   'table.alignRight': 'Align right',

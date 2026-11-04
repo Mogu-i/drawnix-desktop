@@ -1,7 +1,8 @@
 import React from 'react';
 import { PlaitBoard } from '@plait/core';
-import { CardElement } from './type';
+import { Card, CardElement } from './type';
 import { setCardData } from './transforms';
+import { FileRefCardContent } from './file-ref-content';
 import { fileOpen } from '../../data/filesystem';
 import { getDataURL } from '../../data/blob';
 import { buildImage, loadHTMLImageElement } from '../../data/image';
@@ -16,6 +17,11 @@ export interface CardContentProps {
 export const CardContent: React.FC<CardContentProps> = ({ board, element }) => {
   const { t } = i18nInsidePlaitHook();
 
+  // 文件引用卡片：只读渲染源文件内容，双击由 with-card 拦截进入文档编辑器
+  if (Card.isFileRefCard(element)) {
+    return <FileRefCardContent element={element}></FileRefCardContent>;
+  }
+
   const handleInsertImage = async () => {
     try {
       const imageFile = await fileOpen({
@@ -28,7 +34,7 @@ export const CardContent: React.FC<CardContentProps> = ({ board, element }) => {
       const image = await loadHTMLImageElement(dataURL);
       const imageItem = buildImage(image, dataURL, 220);
       setCardData(board, element, { image: imageItem });
-    } catch (error) {
+    } catch {
       // 用户取消选择，忽略
     }
   };

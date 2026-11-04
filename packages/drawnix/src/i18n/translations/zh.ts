@@ -12,6 +12,9 @@ const zhTranslations: Translations = {
   'toolbar.extraTools': '更多工具',
   'toolbar.card': '卡片',
   'card.insertImage': '插入图片',
+  'card.fileRef.loading': '加载中…',
+  'card.fileRef.missing': '文件不存在或已被移动/删除',
+  'card.fileRef.openHint': '双击打开编辑',
 
   'toolbar.pen': '画笔 — P',
   'toolbar.eraser': '橡皮擦 — E',
@@ -174,7 +177,7 @@ const zhTranslations: Translations = {
   'table.borderNone': '无边框',
   'table.borderOuter': '外边框',
   'table.selectionHint':
-    '单击选择，拖动或 Shift+单击多选，双击编辑单元格，拖动表格边缘调整行高列宽',
+    '单击选择，拖动或 Shift+单击多选，双击或回车编辑，拖动表格边缘调整行高列宽；Tab/方向键切换单元格',
   'table.alignLeft': '左对齐',
   'table.alignCenter': '水平居中',
   'table.alignRight': '右对齐',

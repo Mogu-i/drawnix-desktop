@@ -11,26 +11,20 @@ import { useI18n } from '../../i18n';
 import type { Translations } from '../../i18n/types';
 import './table-editor.scss';
 import { useDocAutoSave } from './use-doc-auto-save';
-
-const DEFAULT_BORDER_COLOR = '#b4b4b4';
+import {
+  DEFAULT_TABLE_COL_WIDTH,
+  DEFAULT_TABLE_ROW_HEIGHT,
+  buildTableCellStyle,
+  buildTableTextEffectStyle,
+  getTableColWidths,
+  getTableRowHeights,
+} from './table-style';
 
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
-
-const DEFAULT_COL_WIDTH = 96;
-
-const DEFAULT_ROW_HEIGHT = 32;
 
 const MIN_COL_WIDTH = 40;
 
 const MIN_ROW_HEIGHT = 24;
-
-/** 取整表生效的列宽，未自定义的列回退到默认宽度 */
-const getColWidths = (data: TableFileData): number[] =>
-  Array.from({ length: data.cols }, (_, i) => data.colWidths?.[i] ?? DEFAULT_COL_WIDTH);
-
-/** 取整表生效的行高，未自定义的行回退到默认高度 */
-const getRowHeights = (data: TableFileData): number[] =>
-  Array.from({ length: data.rows }, (_, i) => data.rowHeights?.[i] ?? DEFAULT_ROW_HEIGHT);
 
 /** 对齐图标线段坐标（16x16 视图框），h 为水平三横线，v 为垂直三竖线 */
 const ALIGN_ICON_LINES: Record<string, [number, number][]> = {
@@ -72,22 +66,6 @@ const EFFECT_LABEL_KEYS = {
   underline: 'table.underline',
   strikethrough: 'table.strikethrough',
 } as const;
-
-/** 文字效果（加粗/下划线/删除线）样式；textarea 需显式应用，不能依赖继承 */
-const buildCellTextStyle = (cell: TableCellData): React.CSSProperties => {
-  const style: React.CSSProperties = {};
-  if (cell.bold) {
-    style.fontWeight = 700;
-  }
-  const decorations = [
-    cell.underline ? 'underline' : '',
-    cell.strikethrough ? 'line-through' : '',
-  ].filter(Boolean);
-  if (decorations.length > 0) {
-    style.textDecoration = decorations.join(' ');
-  }
-  return style;
-};
 
 /** 对齐方式的翻译键，避免动态拼接导致类型不安全 */
 const ALIGN_LABEL_KEYS: Record<AlignKind, keyof Translations> = {
@@ -217,6 +195,8 @@ export const TableEditor = ({ path }: { path: string }) => {
     colWidths: number[];
     rowHeights: number[];
   } | null>(null);
+  // 表格容器：接收键盘导航事件（tabIndex 聚焦）
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
 
   const serialize = useCallback(
     () => (dataRef.current ? JSON.stringify(dataRef.current, null, 2) : null),
@@ -292,7 +272,7 @@ export const TableEditor = ({ path }: { path: string }) => {
       insertAt = master.row + (master.cell.rowSpan ?? 1);
     }
     next.cells.splice(insertAt, 0, Array.from({ length: next.cols }, buildEmptyTableCell));
-    next.rowHeights?.splice(insertAt, 0, DEFAULT_ROW_HEIGHT);
+    next.rowHeights?.splice(insertAt, 0, DEFAULT_TABLE_ROW_HEIGHT);
     next.rows += 1;
     commit(next);
   };
@@ -333,7 +313,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     next.cells.forEach((row) => {
       row.splice(insertAt, 0, buildEmptyTableCell());
     });
-    next.colWidths?.splice(insertAt, 0, DEFAULT_COL_WIDTH);
+    next.colWidths?.splice(insertAt, 0, DEFAULT_TABLE_COL_WIDTH);
     next.cols += 1;
     commit(next);
   };
@@ -475,14 +455,89 @@ export const TableEditor = ({ path }: { path: string }) => {
     commit(next);
   };
 
-  // 单击仅选中，双击才进入编辑（onDoubleClick），避免误触
+  // 单击仅选中，双击才进入编辑（onDoubleClick），避免误触；
+  // 同时聚焦表格容器以接收键盘导航事件
   const handleCellMouseDown = (row: number, col: number, event: React.MouseEvent) => {
+    focusTableWrap();
     if (event.shiftKey && sel) {
       setSel({ anchor: sel.anchor, focus: { row, col } });
       return;
     }
     mouseDownRef.current = true;
     setSel({ anchor: { row, col }, focus: { row, col } });
+  };
+
+  // ----- 键盘导航 -----
+
+  // 键盘事件由可聚焦的表格容器接收：单击单元格时主动聚焦，
+  // 编辑框提交/退出后也把焦点交还容器，保证后续导航按键不丢失
+  const focusTableWrap = () => {
+    tableWrapRef.current?.focus({ preventScroll: true });
+  };
+
+  /** 钳制到有效范围；目标落在合并区域内时落到主单元格 */
+  const clampCell = (row: number, col: number): CellPos => {
+    if (!data) {
+      return { row, col };
+    }
+    const r = Math.min(data.rows - 1, Math.max(0, row));
+    const c = Math.min(data.cols - 1, Math.max(0, col));
+    const master = findMasterCell(data, r, c);
+    return master ? { row: master.row, col: master.col } : { row: r, col: c };
+  };
+
+  // 方向键移动选区到相邻单元格（不回绕）
+  const moveSelection = (dRow: number, dCol: number) => {
+    if (!sel) {
+      return;
+    }
+    const next = clampCell(sel.anchor.row + dRow, sel.anchor.col + dCol);
+    setSel({ anchor: next, focus: next });
+  };
+
+  // Tab 横向切换单元格，行尾回绕到下一行行首（Shift+Tab 反向）
+  const moveSelectionByTab = (backwards: boolean) => {
+    if (!data || !sel) {
+      return;
+    }
+    const col = sel.anchor.col + (backwards ? -1 : 1);
+    const row = sel.anchor.row + (col < 0 || col >= data.cols ? (backwards ? -1 : 1) : 0);
+    const next = clampCell(row, (col + data.cols) % data.cols);
+    setSel({ anchor: next, focus: next });
+  };
+
+  // 选中态键盘处理：Enter 进入编辑，Tab/方向键切换单元格；
+  // 编辑态按键由单元格内的 textarea 自行处理（此处冒泡时已在编辑中，直接忽略）
+  const handleTableKeyDown = (event: React.KeyboardEvent) => {
+    if (editing || !sel || event.ctrlKey || event.altKey || event.metaKey) {
+      return;
+    }
+    switch (event.key) {
+      case 'Enter':
+        event.preventDefault();
+        setEditing(sel.anchor);
+        return;
+      case 'Tab':
+        event.preventDefault();
+        moveSelectionByTab(event.shiftKey);
+        return;
+      case 'ArrowUp':
+        event.preventDefault();
+        moveSelection(-1, 0);
+        return;
+      case 'ArrowDown':
+        event.preventDefault();
+        moveSelection(1, 0);
+        return;
+      case 'ArrowLeft':
+        event.preventDefault();
+        moveSelection(0, -1);
+        return;
+      case 'ArrowRight':
+        event.preventDefault();
+        moveSelection(0, 1);
+        return;
+    }
   };
 
   const handleCellMouseEnter = (row: number, col: number) => {
@@ -511,8 +566,8 @@ export const TableEditor = ({ path }: { path: string }) => {
       return;
     }
     const sizes = resizePreview ?? {
-      colWidths: getColWidths(data),
-      rowHeights: getRowHeights(data),
+      colWidths: getTableColWidths(data.colWidths, data.cols),
+      rowHeights: getTableRowHeights(data.rowHeights, data.rows),
     };
     resizeRef.current = {
       type,
@@ -571,35 +626,6 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [resizing, commit]);
 
-  const buildCellStyle = (cell: TableCellData): React.CSSProperties => {
-    const style: React.CSSProperties = {};
-    if (cell.fontSize) {
-      style.fontSize = `${cell.fontSize}px`;
-    }
-    if (cell.color) {
-      style.color = cell.color;
-    }
-    if (cell.bg) {
-      style.backgroundColor = cell.bg;
-    }
-    const border = cell.border;
-    const borderColor = border?.color || DEFAULT_BORDER_COLOR;
-    // 对齐方式未设置时保持默认的左对齐/顶端对齐
-    style.textAlign = cell.align ?? 'left';
-    style.verticalAlign = cell.valign ?? 'top';
-    // 加粗/下划线/删除线；未设置时保持默认（不加粗、无装饰）
-    Object.assign(style, buildCellTextStyle(cell));
-    style.borderTop =
-      border?.top === false ? 'none' : border?.top ? `1px solid ${borderColor}` : undefined;
-    style.borderRight =
-      border?.right === false ? 'none' : border?.right ? `1px solid ${borderColor}` : undefined;
-    style.borderBottom =
-      border?.bottom === false ? 'none' : border?.bottom ? `1px solid ${borderColor}` : undefined;
-    style.borderLeft =
-      border?.left === false ? 'none' : border?.left ? `1px solid ${borderColor}` : undefined;
-    return style;
-  };
-
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
   }
@@ -609,8 +635,8 @@ export const TableEditor = ({ path }: { path: string }) => {
   }
 
   // 拖拽调整过程中使用预览尺寸，否则使用已保存的尺寸
-  const colWidths = resizePreview?.colWidths ?? getColWidths(data);
-  const rowHeights = resizePreview?.rowHeights ?? getRowHeights(data);
+  const colWidths = resizePreview?.colWidths ?? getTableColWidths(data.colWidths, data.cols);
+  const rowHeights = resizePreview?.rowHeights ?? getTableRowHeights(data.rowHeights, data.rows);
   const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
   const tableHeight = rowHeights.reduce((sum, height) => sum + height, 0);
   const colOffsets = [0];
@@ -787,6 +813,9 @@ export const TableEditor = ({ path }: { path: string }) => {
       </div>
       <div className="table-editor__canvas">
         <div
+          ref={tableWrapRef}
+          tabIndex={0}
+          onKeyDown={handleTableKeyDown}
           className={classNames('table-editor__table-wrap', {
             'table-editor__table-wrap--resizing': resizing,
           })}
@@ -816,7 +845,7 @@ export const TableEditor = ({ path }: { path: string }) => {
                         key={c}
                         rowSpan={cell.rowSpan ?? 1}
                         colSpan={cell.colSpan ?? 1}
-                        style={buildCellStyle(cell)}
+                        style={buildTableCellStyle(cell)}
                         className={classNames('table-editor__cell', {
                           'table-editor__cell--selected': selected,
                         })}
@@ -828,7 +857,7 @@ export const TableEditor = ({ path }: { path: string }) => {
                           <textarea
                             className="table-editor__cell-editor"
                             defaultValue={cell.text}
-                            style={buildCellTextStyle(cell)}
+                            style={buildTableTextEffectStyle(cell)}
                             autoFocus
                             // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
                             onMouseDown={(event) => event.stopPropagation()}
@@ -850,6 +879,16 @@ export const TableEditor = ({ path }: { path: string }) => {
                               ) {
                                 event.preventDefault();
                                 (event.target as HTMLTextAreaElement).blur();
+                                focusTableWrap();
+                                return;
+                              }
+                              // Tab 提交并横向切换单元格（Shift+Tab 反向）
+                              if (event.key === 'Tab') {
+                                event.preventDefault();
+                                setCellText(r, c, event.currentTarget.value);
+                                setEditing(null);
+                                moveSelectionByTab(event.shiftKey);
+                                focusTableWrap();
                               }
                             }}
                           />

@@ -14,6 +14,9 @@ const arTranslations: Translations = {
   'toolbar.extraTools': 'أدوات إضافية',
   'toolbar.card': 'بطاقة',
   'card.insertImage': 'إدراج صورة',
+  'card.fileRef.loading': 'جارٍ التحميل…',
+  'card.fileRef.missing': 'الملف غير موجود أو تم نقله/حذفه',
+  'card.fileRef.openHint': 'انقر نقرًا مزدوجًا للتحرير',
 
   'toolbar.arrow.straight': 'سهم مستقيم',
   'toolbar.arrow.elbow': 'سهم بزوايا',
@@ -173,7 +176,7 @@ const arTranslations: Translations = {
   'table.borderNone': 'بدون حدود',
   'table.borderOuter': 'الحدود الخارجية',
   'table.selectionHint':
-    'انقر للتحديد، اسحب أو Shift+انقر لتحديد متعدد، انقر نقرًا مزدوجًا للتحرير، اسحب حواف الجدول لتغيير الحجم',
+    'انقر للتحديد، اسحب أو Shift+انقر لتحديد متعدد، انقر نقرًا مزدوجًا أو Enter للتحرير، اسحب حواف الجدول لتغيير الحجم؛ Tab/الأسهم للتنقل بين الخلايا',
   'table.alignLeft': 'محاذاة لليسار',
   'table.alignCenter': 'توسيط أفقي',
   'table.alignRight': 'محاذاة لليمين',

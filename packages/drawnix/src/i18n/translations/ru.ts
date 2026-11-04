@@ -12,6 +12,9 @@ const ruTranslations: Translations = {
   'toolbar.extraTools': 'Дополнительно',
   'toolbar.card': 'Карточка',
   'card.insertImage': 'Вставить изображение',
+  'card.fileRef.loading': 'Загрузка…',
+  'card.fileRef.missing': 'Файл не найден, перемещён или удалён',
+  'card.fileRef.openHint': 'Двойной щелчок для редактирования',
 
   'toolbar.pen': 'Карандаш — P',
   'toolbar.eraser': 'Ластик — E',
@@ -175,7 +178,7 @@ const ruTranslations: Translations = {
   'table.borderNone': 'Без границ',
   'table.borderOuter': 'Внешняя граница',
   'table.selectionHint':
-    'Клик — выбор, перетаскивание или Shift+клик — несколько ячеек, двойной клик — редактирование, потянуть за край — изменить размер',
+    'Клик — выбор, перетаскивание или Shift+клик — несколько ячеек, двойной клик или Enter — редактирование, потянуть за край — изменить размер; Tab/стрелки — навигация по ячейкам',
   'table.alignLeft': 'По левому краю',
   'table.alignCenter': 'По центру',
   'table.alignRight': 'По правому краю',

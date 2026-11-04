@@ -169,7 +169,9 @@ export class CardComponent
         value.hasThemeChanged ||
         value.element.title !== previous.element.title ||
         value.element.content !== previous.element.content ||
-        value.element.image !== previous.element.image;
+        value.element.image !== previous.element.image ||
+        value.element.filePath !== previous.element.filePath ||
+        value.element.fileType !== previous.element.fileType;
       const styleChanged =
         value.element.fill !== previous.element.fill ||
         value.element.strokeColor !== previous.element.strokeColor ||

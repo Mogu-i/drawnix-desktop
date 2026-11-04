@@ -3,6 +3,7 @@ import {
   clearTauriFileDirty,
   isTauriFileSaveSuppressed,
   markTauriFileDirty,
+  notifyTauriFilesChanged,
   resumeTauriFileSave,
   writeTauriFile,
 } from '../../data/tauri-file';
@@ -42,6 +43,8 @@ export const useDocAutoSave = (
     writeTauriFile(path, content, fileType)
       .then(() => {
         clearTauriFileDirty();
+        // 文件内容已落盘，广播变更让文件面板与白板中的文件引用卡片同步刷新
+        notifyTauriFilesChanged();
       })
       .catch((error) => {
         console.error(`Failed to save ${fileType} file:`, error);

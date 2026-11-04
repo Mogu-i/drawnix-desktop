@@ -1,4 +1,4 @@
-import { setCurrentTauriFile } from '../../data/tauri-file';
+import { closeTauriDocEditor } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import { MarkdownEditor } from './markdown-editor';
 import { TableEditor } from './table-editor';
@@ -18,8 +18,9 @@ export const DocEditor = ({
   const { t } = useI18n();
 
   const handleClose = () => {
-    // 子组件卸载时会立即保存未落盘的修改
-    setCurrentTauriFile(null);
+    // 子组件卸载时会立即保存未落盘的修改；
+    // 若是从白板（双击引用卡片）进入，则恢复之前的白板文件上下文
+    closeTauriDocEditor();
   };
 
   return (
