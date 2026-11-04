@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '../dialog/dialog';
 import { Select } from '../select/select';
 import {
+  CreateTauriFileOptions,
+  TauriFileType,
   TauriTreeDirEntry,
   isTauriEnvironment,
   listTauriTree,
@@ -17,8 +19,22 @@ const parentOf = (rel: string) => {
   return idx < 0 ? '' : rel.slice(0, idx);
 };
 
-// 新建文件弹窗：输入文件名并选择所在目录后确认创建，
-// 由侧边栏文件面板与欢迎页共用。
+const FILE_TYPE_OPTIONS: TauriFileType[] = ['drawnix', 'md', 'table'];
+
+const DEFAULT_TABLE_ROWS = 3;
+const DEFAULT_TABLE_COLS = 3;
+const MIN_TABLE_SIZE = 1;
+const MAX_TABLE_SIZE = 50;
+
+const clampTableSize = (value: number, fallback: number) => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(MAX_TABLE_SIZE, Math.max(MIN_TABLE_SIZE, Math.round(value)));
+};
+
+// 新建文件弹窗：选择文件类型（白板/Markdown/表格）、输入文件名并选择所在目录后
+// 确认创建，由侧边栏文件面板与欢迎页共用。
 export const CreateFileDialog = ({
   open,
   onOpenChange,
@@ -28,17 +44,28 @@ export const CreateFileDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   container?: HTMLElement | null;
-  onCreate: (name: string, dirPath: string | null) => void;
+  onCreate: (
+    name: string,
+    dirPath: string | null,
+    fileType: TauriFileType,
+    options: CreateTauriFileOptions
+  ) => void;
 }) => {
   const { t } = useI18n();
   const [fileName, setFileName] = useState('');
   const [dirs, setDirs] = useState<TauriTreeDirEntry[]>([]);
   const [dirPath, setDirPath] = useState('');
+  const [fileType, setFileType] = useState<TauriFileType>('drawnix');
+  const [tableRows, setTableRows] = useState(DEFAULT_TABLE_ROWS);
+  const [tableCols, setTableCols] = useState(DEFAULT_TABLE_COLS);
 
   useEffect(() => {
     if (open) {
       setFileName('');
       setDirPath('');
+      setFileType('drawnix');
+      setTableRows(DEFAULT_TABLE_ROWS);
+      setTableCols(DEFAULT_TABLE_COLS);
       if (isTauriEnvironment()) {
         listTauriTree()
           .then((tree) => setDirs(tree.dirs))
@@ -54,7 +81,10 @@ export const CreateFileDialog = ({
     if (!name) {
       return;
     }
-    onCreate(name, dirPath || null);
+    onCreate(name, dirPath || null, fileType, {
+      rows: clampTableSize(tableRows, DEFAULT_TABLE_ROWS),
+      cols: clampTableSize(tableCols, DEFAULT_TABLE_COLS),
+    });
     onOpenChange(false);
   };
 
@@ -65,6 +95,31 @@ export const CreateFileDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="create-file-dialog" container={container}>
         <h2 className="create-file-dialog__title">{t('filePanel.newFile')}</h2>
+        <div className="create-file-dialog__group">
+          <div className="create-file-dialog__group-label">
+            {t('filePanel.fileType')}
+          </div>
+          <Select.Root
+            value={fileType}
+            onValueChange={(value) => {
+              setFileType(value as TauriFileType);
+            }}
+          >
+            <Select.Trigger
+              className="create-file-dialog__select"
+              aria-label={t('filePanel.fileType')}
+            >
+              {t(`filePanel.fileType.${fileType}`)}
+            </Select.Trigger>
+            <Select.Content container={container}>
+              {FILE_TYPE_OPTIONS.map((type) => (
+                <Select.Item key={type} value={type}>
+                  {t(`filePanel.fileType.${type}`)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </div>
         <input
           className="create-file-dialog__input"
           type="text"
@@ -79,6 +134,34 @@ export const CreateFileDialog = ({
             }
           }}
         />
+        {fileType === 'table' && (
+          <div className="create-file-dialog__table-size">
+            <label className="create-file-dialog__table-size-item">
+              <span>{t('filePanel.tableRows')}</span>
+              <input
+                type="number"
+                min={MIN_TABLE_SIZE}
+                max={MAX_TABLE_SIZE}
+                value={tableRows}
+                onChange={(event) =>
+                  setTableRows(clampTableSize(Number(event.target.value), DEFAULT_TABLE_ROWS))
+                }
+              />
+            </label>
+            <label className="create-file-dialog__table-size-item">
+              <span>{t('filePanel.tableCols')}</span>
+              <input
+                type="number"
+                min={MIN_TABLE_SIZE}
+                max={MAX_TABLE_SIZE}
+                value={tableCols}
+                onChange={(event) =>
+                  setTableCols(clampTableSize(Number(event.target.value), DEFAULT_TABLE_COLS))
+                }
+              />
+            </label>
+          </div>
+        )}
         {dirs.length > 0 && (
           <div className="create-file-dialog__group">
             <div className="create-file-dialog__group-label">

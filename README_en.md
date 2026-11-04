@@ -17,13 +17,14 @@
 
 ## About
 
-**drawnix-desktop** is a **desktop application** derived from the open-source whiteboard tool [plait-board/drawnix](https://github.com/plait-board/drawnix). It wraps the original web app into a cross-platform desktop app with the [Tauri](https://tauri.app) framework, and adds a card plugin and local file management on top of the existing feature set.
+**drawnix-desktop** is a **desktop application** derived from the open-source whiteboard tool [plait-board/drawnix](https://github.com/plait-board/drawnix). It wraps the original web app into a cross-platform desktop app with the [Tauri](https://tauri.app) framework, and adds Markdown / table editing, a card plugin and local file management on top of the existing feature set.
 
 Main changes compared to the upstream project:
 
 - **Desktop**: packaged as a desktop app with Tauri 2.x (Rust backend + webview frontend), producing NSIS / MSI installers on Windows;
 - **Card Plugin**: insert card elements on the whiteboard. Cards support a title, body text, an image, fill color and stroke styles, and can serve as endpoints for arrow lines;
-- **Local File Management**: a file-tree sidebar (TauriFilePanel) built on the Tauri file system. Board content is stored as `.drawnix` files in a local data directory instead of browser storage.
+- **Multi-type local file management**: a file-tree sidebar (TauriFilePanel) built on the Tauri file system, supporting three file types — whiteboard `.drawnix`, Markdown `.md` and table `.table` — stored in a local data directory instead of browser storage;
+- **Doc editors and file-reference cards**: Markdown / table files come with dedicated editors (DocEditor), and cards on the whiteboard can reference files to preview their content live.
 
 ## Features
 
@@ -45,13 +46,17 @@ Inherited from upstream drawnix:
 Added by this project:
 
 - 🖥 **Desktop app**: packaged with Tauri, ready to use out of the box, no deployment required
+- 📝 **Multiple file types**: the file tree supports creating / opening / editing whiteboard `.drawnix`, Markdown `.md` and table `.table` files
+- 📖 **Markdown editor**: source / split / preview view modes, a formatting toolbar, list prefixes continued automatically on Enter, task lists checkable right in the preview, with debounced auto-save
+- 📊 **Table editor**: insert / delete rows and columns, merge cells, border styles, font size and text color, cell background color, drag to adjust row heights and column widths, with debounced auto-save
+- 🔗 **File-reference cards**: insert a card on the whiteboard that references a `.md` / `.table` file and renders its content live (including task-checkbox interaction); double-click the card to open the editor, and it syncs automatically when the source file changes
 - 🗂 **Card plugin**: insert card elements with a title, body text and an image; supports fill color and stroke styles, and can be bound by arrow lines
-- 📁 **Local file management**: file-tree sidebar with create / rename / delete for `.drawnix` files and folders (groups and sub-groups)
+- 📁 **Local file management**: file-tree sidebar with create / rename / delete for files and folders (groups and sub-groups)
 - 🔀 **Groups and moving**: files and groups can be dragged into any group, with custom ordering
 - ♻️ **Trash**: deleted files go to the trash, where they can be restored or purged; retention days are configurable and expired items are cleaned up automatically
 - 💾 **Save and auto-save**: save via the toolbar button or `Cmd/Ctrl+S`; unsaved changes are saved automatically before switching files, saving a copy, or exporting images
 - 📌 **Unsaved-changes marker**: when the current file has unsaved changes, a dirty marker is shown in the file panel and next to the file title
-- ⚙️ **Data directory setting**: customize the local directory where `.drawnix` files are stored; existing files are migrated when the directory changes
+- ⚙️ **Data directory setting**: customize the local data directory where `.drawnix` / `.md` / `.table` files are stored; existing files are migrated when the directory changes
 - 🧭 **Desktop welcome page**: a welcome page is shown when no file is open, so you can start creating right away
 
 ## About the Name
@@ -72,8 +77,8 @@ Like a Phoenix, creativity must rise from the flames to be reborn, and ***Drawni
 
 Building on that, this project (drawnix-desktop):
 
-- reuses the whiteboard core made up of the `packages/drawnix`, `packages/react-board` and `packages/react-text` packages, and adds the card plugin plus desktop-side file management code;
-- implements local file read/write, trash and data-directory capabilities in Rust under `src-tauri` (based on Tauri 2.x and tauri-plugin-dialog), which the frontend calls through Tauri commands.
+- reuses the whiteboard core made up of the `packages/drawnix`, `packages/react-board` and `packages/react-text` packages, and adds the card plugin (including file-reference cards), the Markdown/table doc editors plus desktop-side file management code;
+- implements local file read/write, trash and data-directory capabilities for `.drawnix` / `.md` / `.table` files in Rust under `src-tauri` (based on Tauri 2.x and tauri-plugin-dialog), which the frontend calls through Tauri commands.
 
 Many thanks to the upstream project [plait-board/drawnix](https://github.com/plait-board/drawnix) and the [Plait](https://github.com/worktile/plait) framework for keeping their work open source.
 
@@ -90,7 +95,7 @@ drawnix-desktop/
 │   ├── icons/                #   App icons
 │   └── tauri.conf.json       #   Tauri configuration (window, bundle targets, etc.)
 ├── packages/
-│   ├── drawnix/              # Whiteboard app core (card plugin, TauriFilePanel, welcome page, etc.)
+│   ├── drawnix/              # Whiteboard app core (card plugin, doc editors, TauriFilePanel, welcome page, etc.)
 │   ├── react-board/          # Whiteboard React view layer
 │   └── react-text/           # Text rendering module
 ├── scripts/                  # Release and npm publishing scripts
@@ -160,6 +165,8 @@ docker run -p 80:80 drawnix-web
 - [slate](https://github.com/ianstormtaylor/slate) - Rich text editor framework
 - [floating-ui](https://github.com/floating-ui/floating-ui) - An awesome library for creating floating UI elements
 - [tauri](https://github.com/tauri-apps/tauri) - Cross-platform desktop app framework
+- [marked](https://github.com/markedjs/marked) - Markdown parser and renderer
+- [dompurify](https://github.com/cure53/DOMPurify) - HTML sanitizing library
 
 ## Contributing
 

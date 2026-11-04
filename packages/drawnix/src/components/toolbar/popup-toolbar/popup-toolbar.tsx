@@ -76,10 +76,15 @@ export const PopupToolbar = () => {
     fill: 'red',
   };
   if (open && !movingOrDragging && !hasImage) {
+    // 文件引用卡片（md/表格）内容只读，弹出工具栏仅保留描边颜色，
+    // 隐藏字号/字体颜色/填充颜色选项；普通卡片与其他元素不受影响
+    const isFileRefCardSelected = selectedElements.some(Card.isFileRefCard);
     const hasFill =
+      !isFileRefCardSelected &&
       selectedElements.some((value) => hasFillProperty(board, value)) &&
       !PlaitBoard.hasBeenTextEditing(board);
-    const hasText = selectedElements.some((value) => hasTextProperty(board, value));
+    const hasText =
+      !isFileRefCardSelected && selectedElements.some((value) => hasTextProperty(board, value));
     const hasStroke =
       selectedElements.some((value) => hasStrokeProperty(board, value)) &&
       !PlaitBoard.hasBeenTextEditing(board);

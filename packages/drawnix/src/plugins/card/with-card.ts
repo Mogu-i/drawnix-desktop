@@ -12,9 +12,41 @@ import { getTextManages, isDelete, isSpaceHotkey, isVirtualKey } from '@plait/co
 import { isGeometryIncludeText, PlaitDrawElement } from '@plait/draw';
 import { CardComponent } from './card.component';
 import { Card, CARD_GEOMETRY_SHAPE, CARD_GEOMETRY_TYPE, CARD_TYPE } from './type';
+import { insertFileRefCard, openFileRefCardEditor } from './transforms';
 
 // tolerance for clicking a card border, in board units
 const CARD_HIT_TOLERANCE = 4;
+
+/** 文件引用卡片支持的拖入文件扩展名 */
+const FILE_REF_EXTS = ['md', 'table'];
+
+/** 文件面板拖拽项的数据结构（写入 text/plain） */
+type PanelDragItem = { type: 'file' | 'folder'; id: string; ext?: string };
+
+/** 从拖放事件中解析可生成引用卡片的文件面板拖拽项 */
+const readDroppedFileRef = (
+  event: DragEvent
+): { path: string; fileType: 'md' | 'table' } | null => {
+  try {
+    const raw = event.dataTransfer?.getData('text/plain');
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as PanelDragItem;
+    if (
+      parsed &&
+      parsed.type === 'file' &&
+      typeof parsed.id === 'string' &&
+      parsed.ext &&
+      FILE_REF_EXTS.includes(parsed.ext)
+    ) {
+      return { path: parsed.id, fileType: parsed.ext as 'md' | 'table' };
+    }
+  } catch {
+    // 非文件面板的拖拽数据，忽略
+  }
+  return null;
+};
 
 // element types saved by card plugin versions before cards became geometry
 // elements; they cannot be resolved by the plugin chain and must be migrated
@@ -52,7 +84,7 @@ export const migrateLegacyBoardData = (
 };
 
 export const withCard = (board: PlaitBoard) => {
-  const { drawElement, isHit, isRectangleHit, keyDown, dblClick } = board;
+  const { drawElement, isHit, isRectangleHit, keyDown, dblClick, drop } = board;
 
   board.children = migrateLegacyBoardData(board.children);
 
@@ -131,12 +163,29 @@ export const withCard = (board: PlaitBoard) => {
     keyDown(event);
   };
 
+  // 从文件面板拖拽 Markdown/表格文件到画布：在鼠标松开位置生成文件引用卡片。
+  // 插件链中该处理位于 with-image 之后：外部图片文件先由 with-image 处理，
+  // 无图片文件时回落到这里，再继续向内层插件（with-draw 等）传递
+  board.drop = (event: DragEvent) => {
+    const fileRef = readDroppedFileRef(event);
+    if (fileRef) {
+      const point = toViewBoxPoint(board, toHostPoint(board, event.x, event.y));
+      insertFileRefCard(board, point, fileRef.path, fileRef.fileType);
+      return true;
+    }
+    return drop(event);
+  };
+
   board.dblClick = (event: MouseEvent) => {
     const point = toViewBoxPoint(board, toHostPoint(board, event.x, event.y));
     const hitCard = board.children.find(
       (element) => Card.isCard(element) && board.isHit(element, point)
     );
     if (hitCard) {
+      if (Card.isFileRefCard(hitCard)) {
+        // 双击文件引用卡片：进入对应文件的文档编辑器
+        openFileRefCardEditor(board, hitCard);
+      }
       // let the card's own contentEditable handle text editing
       return;
     }

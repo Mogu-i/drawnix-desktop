@@ -9,10 +9,14 @@ import {
 } from '@plait/core';
 import {
   buildEmptyDrawnixContent,
+  buildEmptyMarkdownContent,
+  buildEmptyTableContent,
+  CreateTauriFileOptions,
   isTauriEnvironment,
   notifyTauriFilesChanged,
   setCurrentTauriFile,
   suppressTauriDirty,
+  TauriFileType,
   useTauriFileState,
   writeTauriFile,
 } from '../../data/tauri-file';
@@ -56,15 +60,28 @@ export const WelcomePage = () => {
     BoardTransforms.fitViewport(board);
   };
 
-  const handleCreateFile = async (name: string, dirPath: string | null) => {
+  const handleCreateFile = async (
+    name: string,
+    dirPath: string | null,
+    fileType: TauriFileType,
+    options: CreateTauriFileOptions
+  ) => {
     try {
       const path = dirPath ? `${dirPath}/${name}` : name;
-      await writeTauriFile(path, buildEmptyDrawnixContent());
-      setCurrentTauriFile(path);
+      if (fileType === 'md') {
+        await writeTauriFile(path, buildEmptyMarkdownContent(), 'md');
+        setCurrentTauriFile(path, 'md');
+      } else if (fileType === 'table') {
+        await writeTauriFile(path, buildEmptyTableContent(options.rows, options.cols), 'table');
+        setCurrentTauriFile(path, 'table');
+      } else {
+        await writeTauriFile(path, buildEmptyDrawnixContent());
+        setCurrentTauriFile(path);
+        clearAndLoad([]);
+      }
       notifyTauriFilesChanged();
-      clearAndLoad([]);
     } catch (error) {
-      console.error('Failed to create drawnix file:', error);
+      console.error('Failed to create file:', error);
       showToast({ message: t('toast.tauriFile.saveFailed') });
     }
   };

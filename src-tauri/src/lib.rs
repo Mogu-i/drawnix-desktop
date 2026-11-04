@@ -9,6 +9,28 @@ use tauri_plugin_dialog::DialogExt;
 const DEFAULT_TRASH_RETENTION_DAYS: u32 = 3;
 const INDEX_FILE_NAME: &str = "folders.json";
 
+/// 受支持的文件扩展名：白板 .drawnix、Markdown .md、表格 .table
+const FILE_EXTENSIONS: [&str; 3] = ["drawnix", "md", "table"];
+
+/// 校验前端传入的文件类型（缺省为白板 .drawnix）
+fn normalize_ext(ext: Option<&str>) -> Result<&'static str, String> {
+  match ext.map(|e| e.trim()) {
+    None => Ok("drawnix"),
+    Some(e) => FILE_EXTENSIONS
+      .iter()
+      .find(|supported| **supported == e)
+      .copied()
+      .ok_or_else(|| "unsupported file extension".to_string()),
+  }
+}
+
+/// 去掉受支持扩展名，返回文件主干名
+fn strip_known_ext(file_name: &str) -> Option<&str> {
+  FILE_EXTENSIONS
+    .iter()
+    .find_map(|ext| file_name.strip_suffix(&format!(".{}", ext)))
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
@@ -109,9 +131,9 @@ fn entry_path(app: &tauri::AppHandle, rel: &str) -> Result<PathBuf, String> {
   Ok(files_dir(app)?.join(rel))
 }
 
-/// 文件路径：相对路径自动追加 .drawnix 扩展名（前端传入的 path 不含扩展名）
-fn file_path(app: &tauri::AppHandle, rel: &str) -> Result<PathBuf, String> {
-  Ok(files_dir(app)?.join(format!("{}.drawnix", rel)))
+/// 文件路径：相对路径自动追加扩展名（前端传入的 path 不含扩展名）
+fn file_path(app: &tauri::AppHandle, rel: &str, ext: &str) -> Result<PathBuf, String> {
+  Ok(files_dir(app)?.join(format!("{}.{}", rel, ext)))
 }
 
 fn last_seg(rel: &str) -> &str {
@@ -231,6 +253,8 @@ struct TreeFileEntry {
   path: String,
   created_at: u64,
   modified_at: u64,
+  /// 文件类型（扩展名）：drawnix / md / table
+  ext: String,
 }
 
 #[derive(Serialize)]
@@ -280,11 +304,20 @@ fn collect_tree(
         created_at,
       });
       collect_tree(&path, &child_rel, dirs, files);
-    } else if path.extension().map(|e| e == "drawnix").unwrap_or(false) {
+    } else if path
+      .extension()
+      .map(|e| FILE_EXTENSIONS.contains(&e.to_string_lossy().as_ref()))
+      .unwrap_or(false)
+    {
+      let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_else(|| "drawnix".to_string());
       files.push(TreeFileEntry {
-        path: child_rel.trim_end_matches(".drawnix").to_string(),
+        path: strip_known_ext(&child_rel).unwrap_or(&child_rel).to_string(),
         created_at,
         modified_at,
+        ext,
       });
     }
   }
@@ -309,15 +342,26 @@ fn list_tree(app: tauri::AppHandle) -> Result<TreeResult, String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn read_drawnix_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
+fn read_drawnix_file(
+  app: tauri::AppHandle,
+  path: String,
+  ext: Option<String>,
+) -> Result<String, String> {
   let path = sanitize_rel_path(&path)?;
-  fs::read_to_string(file_path(&app, &path)?).map_err(|e| e.to_string())
+  let ext = normalize_ext(ext.as_deref())?;
+  fs::read_to_string(file_path(&app, &path, ext)?).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn write_drawnix_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
+fn write_drawnix_file(
+  app: tauri::AppHandle,
+  path: String,
+  content: String,
+  ext: Option<String>,
+) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
-  let target = file_path(&app, &path)?;
+  let ext = normalize_ext(ext.as_deref())?;
+  let target = file_path(&app, &path, ext)?;
   if let Some(parent) = target.parent() {
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
   }
@@ -325,13 +369,19 @@ fn write_drawnix_file(app: tauri::AppHandle, path: String, content: String) -> R
 }
 
 #[tauri::command]
-fn rename_drawnix_file(app: tauri::AppHandle, path: String, new_name: String) -> Result<(), String> {
+fn rename_drawnix_file(
+  app: tauri::AppHandle,
+  path: String,
+  new_name: String,
+  ext: Option<String>,
+) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
   let new_name = new_name.trim().trim_matches('/');
   if new_name.is_empty() || new_name.contains('/') || new_name.contains('\\') || new_name.starts_with('.') {
     return Err("invalid file name".to_string());
   }
-  let old_target = file_path(&app, &path)?;
+  let ext = normalize_ext(ext.as_deref())?;
+  let old_target = file_path(&app, &path, ext)?;
   if !old_target.exists() {
     return Err("file not found".to_string());
   }
@@ -339,7 +389,7 @@ fn rename_drawnix_file(app: tauri::AppHandle, path: String, new_name: String) ->
     Some(parent) => format!("{}/{}", parent, new_name),
     None => new_name.to_string(),
   };
-  let new_target = file_path(&app, &new_path)?;
+  let new_target = file_path(&app, &new_path, ext)?;
   if new_target.exists() {
     return Err("target file already exists".to_string());
   }
@@ -364,6 +414,8 @@ fn rename_drawnix_file(app: tauri::AppHandle, path: String, new_name: String) ->
 #[derive(Serialize, Deserialize)]
 struct TrashMeta {
   path: String,
+  #[serde(default)]
+  ext: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -372,24 +424,31 @@ struct DrawnixTrashEntry {
   trash_file: String,
   path: String,
   deleted_at: u64,
+  ext: String,
 }
 
 fn parse_trash_deleted_at(path: &Path) -> Option<u64> {
   let file_name = path.file_name()?.to_string_lossy();
-  let stem = file_name.strip_suffix(".drawnix")?;
+  let stem = strip_known_ext(&file_name)?;
   let (stamp, _) = stem.split_once('_')?;
   stamp.parse::<u64>().ok()
 }
 
-fn move_to_trash(app: &tauri::AppHandle, rel: &str) -> Result<(), String> {
-  let source = file_path(app, rel)?;
+fn move_to_trash(app: &tauri::AppHandle, rel: &str, ext: &str) -> Result<(), String> {
+  let source = file_path(app, rel, ext)?;
   if !source.exists() {
     return Err("file not found".to_string());
   }
-  let trash_file = trash_dir(app)?.join(format!("{}_{}.drawnix", now_millis(), rel.replace('/', "__")));
+  let trash_file = trash_dir(app)?.join(format!(
+    "{}_{}.{}",
+    now_millis(),
+    rel.replace('/', "__"),
+    ext
+  ));
   fs::rename(&source, &trash_file).map_err(|e| e.to_string())?;
   let meta = TrashMeta {
     path: rel.to_string(),
+    ext: Some(ext.to_string()),
   };
   let meta_path = PathBuf::from(format!("{}.json", trash_file.to_string_lossy()));
   fs::write(meta_path, serde_json::to_string(&meta).map_err(|e| e.to_string())?)
@@ -397,9 +456,14 @@ fn move_to_trash(app: &tauri::AppHandle, rel: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn delete_drawnix_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
+fn delete_drawnix_file(
+  app: tauri::AppHandle,
+  path: String,
+  ext: Option<String>,
+) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
-  move_to_trash(&app, &path)?;
+  let ext = normalize_ext(ext.as_deref())?;
+  move_to_trash(&app, &path, ext)?;
   cleanup_expired_trash(&app);
   Ok(())
 }
@@ -415,29 +479,34 @@ fn list_trash_files(app: tauri::AppHandle) -> Result<Vec<DrawnixTrashEntry>, Str
       continue;
     }
     let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    if !file_name.ends_with(".drawnix") {
+    if strip_known_ext(&file_name).is_none() {
       continue;
     }
     let Some(deleted_at) = parse_trash_deleted_at(&path) else {
       continue;
     };
+    let ext = FILE_EXTENSIONS
+      .iter()
+      .find(|e| file_name.ends_with(&format!(".{}", e)))
+      .map(|e| e.to_string())
+      .unwrap_or_else(|| "drawnix".to_string());
     // 优先读取元数据中的原始路径；旧格式回退到文件名解码
-    // 注意：回收站元数据文件名是 `xxx.drawnix.json`，不能使用 with_extension（会替换掉 .drawnix）
+    // 注意：回收站元数据文件名是 `xxx.drawnix.json`，不能使用 with_extension（会替换掉原扩展名）
     let rel_path = fs::read_to_string(format!("{}.json", path.to_string_lossy()))
       .ok()
       .and_then(|content| serde_json::from_str::<TrashMeta>(&content).ok())
       .map(|meta| meta.path)
       .unwrap_or_else(|| {
-        file_name
-          .trim_end_matches(".drawnix")
-          .split_once('_')
-          .map(|(_, name)| name.replace("__", "/"))
+        strip_known_ext(&file_name)
+          .and_then(|stem| stem.split_once('_').map(|(_, name)| name.to_string()))
+          .map(|name| name.replace("__", "/"))
           .unwrap_or(file_name.clone())
       });
     files.push(DrawnixTrashEntry {
       trash_file: file_name,
       path: rel_path,
       deleted_at,
+      ext,
     });
   }
   files.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
@@ -452,18 +521,30 @@ fn restore_drawnix_file(app: tauri::AppHandle, trash_file: String) -> Result<(),
     return Err("trash entry not found".to_string());
   }
   let meta_path = PathBuf::from(format!("{}.json", trash_path.to_string_lossy()));
-  let rel = fs::read_to_string(&meta_path)
+  let (rel, ext) = fs::read_to_string(&meta_path)
     .ok()
     .and_then(|content| serde_json::from_str::<TrashMeta>(&content).ok())
-    .map(|meta| meta.path)
+    .map(|meta| {
+      let ext = meta
+        .ext
+        .as_deref()
+        .and_then(|e| normalize_ext(Some(e)).ok())
+        .unwrap_or("drawnix");
+      (meta.path, ext)
+    })
     .unwrap_or_else(|| {
-      trash_file
-        .trim_end_matches(".drawnix")
-        .split_once('_')
-        .map(|(_, name)| name.replace("__", "/"))
-        .unwrap_or_else(|| trash_file.clone())
+      let ext = FILE_EXTENSIONS
+        .iter()
+        .find(|e| trash_file.ends_with(&format!(".{}", e)))
+        .map(|e| *e)
+        .unwrap_or("drawnix");
+      let rel = strip_known_ext(&trash_file)
+        .and_then(|stem| stem.split_once('_').map(|(_, name)| name.to_string()))
+        .map(|name| name.replace("__", "/"))
+        .unwrap_or_else(|| trash_file.clone());
+      (rel, ext)
     });
-  let target = file_path(&app, &rel)?;
+  let target = file_path(&app, &rel, ext)?;
   if target.exists() {
     return Err("target file already exists".to_string());
   }
@@ -568,7 +649,7 @@ fn rename_folder(app: tauri::AppHandle, path: String, new_name: String) -> Resul
   save_order(&app, &order)
 }
 
-/// 删除分组：内部所有 .drawnix 文件移入回收站，然后删除整个目录
+/// 删除分组：内部所有受支持文件移入回收站，然后删除整个目录
 #[tauri::command]
 fn delete_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
@@ -580,7 +661,7 @@ fn delete_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
   let mut dirs = Vec::new();
   collect_tree(&target, &path, &mut dirs, &mut files);
   for file in files {
-    move_to_trash(&app, &file.path)?;
+    move_to_trash(&app, &file.path, &file.ext)?;
   }
   fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
   // 索引：父目录子文件夹列表移除该分组，并清理其键
@@ -599,8 +680,10 @@ fn move_file_to_dir(
   app: tauri::AppHandle,
   path: String,
   target_dir: Option<String>,
+  ext: Option<String>,
 ) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
+  let ext = normalize_ext(ext.as_deref())?;
   let target_dir = sanitize_dir_path(target_dir)?;
   let name = last_seg(&path).to_string();
   let new_rel = if target_dir.is_empty() {
@@ -611,11 +694,11 @@ fn move_file_to_dir(
   if new_rel == path {
     return Ok(());
   }
-  let source = file_path(&app, &path)?;
+  let source = file_path(&app, &path, ext)?;
   if !source.exists() {
     return Err("file not found".to_string());
   }
-  let target = file_path(&app, &new_rel)?;
+  let target = file_path(&app, &new_rel, ext)?;
   if target.exists() {
     return Err("target file already exists".to_string());
   }
@@ -748,7 +831,7 @@ struct SetDataDirResult {
   migrated_files: u64,
 }
 
-/// 迁移数据目录：递归复制 .drawnix 文件（保留目录结构）与索引文件
+/// 迁移数据目录：递归复制受支持文件（保留目录结构）与索引文件
 fn migrate_data_dir(old_dir: &Path, new_dir: &Path, migrated: &mut u64) -> Result<(), String> {
   // 索引文件一并迁移，目录顺序不丢失
   let index_source = old_dir.join(INDEX_FILE_NAME);
@@ -766,7 +849,11 @@ fn migrate_data_dir(old_dir: &Path, new_dir: &Path, migrated: &mut u64) -> Resul
       let target_dir = new_dir.join(&name);
       fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
       migrate_data_dir(&source, &target_dir, migrated)?;
-    } else if source.extension().map(|ext| ext == "drawnix").unwrap_or(false) {
+    } else if source
+      .extension()
+      .map(|ext| FILE_EXTENSIONS.contains(&ext.to_string_lossy().as_ref()))
+      .unwrap_or(false)
+    {
       fs::copy(&source, new_dir.join(&name)).map_err(|e| e.to_string())?;
       *migrated += 1;
     }

@@ -16,6 +16,9 @@ export const CARD_WIDTH = 260;
 
 export const CARD_HEIGHT = 180;
 
+/** 文件引用卡片支持的文件类型 */
+export type FileRefType = 'md' | 'table';
+
 export interface CardImageData {
   url: string;
   width: number;
@@ -32,6 +35,10 @@ export interface CardElement extends PlaitGeometry {
   // used by @plait/draw, so text marks are stored on these fields
   fontColor?: string | null;
   fontSize?: number;
+  // 文件引用卡片：仅保存数据目录中的文件相对路径（不含扩展名）与类型，
+  // 不复制文件内容，实际内容始终从源文件实时读取
+  filePath?: string;
+  fileType?: FileRefType;
 }
 
 export const Card = {
@@ -43,6 +50,13 @@ export const Card = {
       'customType' in value &&
       (value as { type: string }).type === CARD_GEOMETRY_TYPE &&
       (value as { customType: string }).customType === CARD_TYPE
+    );
+  },
+  isFileRefCard: (value: unknown): value is CardElement => {
+    return (
+      Card.isCard(value) &&
+      typeof (value as CardElement).filePath === 'string' &&
+      (value as CardElement).filePath.length > 0
     );
   },
 };

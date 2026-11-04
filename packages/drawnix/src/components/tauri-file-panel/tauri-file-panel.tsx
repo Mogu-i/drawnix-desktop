@@ -12,13 +12,18 @@ import classNames from 'classnames';
 import { Island } from '../island';
 import { ChevronRightIcon, FolderIcon } from '../icons';
 import {
+  CreateTauriFileOptions,
   DATA_DIR_CHANGED_EVENT,
   TAURI_FILES_CHANGED_EVENT,
+  TauriFileType,
   TauriOrderMap,
   TauriTrashEntry,
   TauriTreeDirEntry,
+  TauriTreeFileEntry,
   TauriTreeResult,
   buildEmptyDrawnixContent,
+  buildEmptyMarkdownContent,
+  buildEmptyTableContent,
   createTauriFolder,
   deleteTauriFile,
   deleteTauriFolder,
@@ -29,15 +34,19 @@ import {
   moveTauriFileToDir,
   moveTauriFolderToDir,
   normalizeTauriFileName,
+  notifyTauriFilesChanged,
   parseTauriFileContent,
   readTauriFile,
   renameTauriFile,
   renameTauriFolder,
   reorderTauriItems,
+  resumeTauriFileSave,
+  retargetDocEditorSessionPath,
   restoreTauriFile,
   saveToTauriFile,
   setCurrentTauriFile,
   suppressTauriDirty,
+  suppressTauriFileSave,
   useTauriFileState,
   writeTauriFile,
 } from '../../data/tauri-file';
@@ -50,12 +59,13 @@ import { useI18n } from '../../i18n';
 import { CreateFileDialog } from '../create-file-dialog/create-file-dialog';
 import { MoveEntryDialog } from '../move-entry-dialog/move-entry-dialog';
 import { SidebarFooter } from '../sidebar-footer/sidebar-footer';
+import { syncFileRefCardPaths } from '../../plugins/card/transforms';
 import './tauri-file-panel.scss';
 
 type PanelView = 'files' | 'trash';
 
-/** 拖拽项：id 为相对路径（文件不含扩展名） */
-type DragItem = { type: 'file' | 'folder'; id: string };
+/** 拖拽项：id 为相对路径（文件不含扩展名），文件项附带类型 */
+type DragItem = { type: 'file' | 'folder'; id: string; ext?: string };
 
 type ContextMenuState = {
   x: number;
@@ -64,7 +74,20 @@ type ContextMenuState = {
   target: string;
   trash: boolean;
   exportOpen: boolean;
+  /** 文件类型（仅文件项） */
+  ext?: string;
 };
+
+/** 待删除的文件目标（含类型） */
+type DeleteFileTarget = { path: string; ext: string };
+
+/** 待移动的条目目标 */
+type MoveTarget =
+  | { kind: 'file'; path: string; ext: string }
+  | { kind: 'folder'; path: string };
+
+const asFileType = (ext: string | undefined): TauriFileType =>
+  ext === 'md' || ext === 'table' ? ext : 'drawnix';
 
 const parentOf = (rel: string) => {
   const idx = rel.lastIndexOf('/');
@@ -81,7 +104,7 @@ export const TauriFilePanel = () => {
   const listRender = useListRender();
   const { showToast } = useDrawnix();
   const { t } = useI18n();
-  const { currentFile, dirty } = useTauriFileState();
+  const { currentFile, fileType: currentFileType, dirty } = useTauriFileState();
   const [tree, setTree] = useState<TauriTreeResult>({
     dirs: [],
     files: [],
@@ -93,16 +116,14 @@ export const TauriFilePanel = () => {
   const [dragItem, setDragItem] = useState<DragItem | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteFileTarget | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<string | null>(null);
-  const [moveTarget, setMoveTarget] = useState<{
-    kind: 'file' | 'folder';
-    path: string;
-  } | null>(null);
+  const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
   const [emptyTrashOpen, setEmptyTrashOpen] = useState(false);
   const [isTauri] = useState(() => isTauriEnvironment());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
+  const [renamingExt, setRenamingExt] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
   const [renamingFolderValue, setRenamingFolderValue] = useState('');
@@ -191,6 +212,28 @@ export const TauriFilePanel = () => {
     showToast({ message });
   };
 
+  // ----- 移动/重命名对当前打开文档的保护 -----
+  // 文档编辑器的防抖保存与卸载 flushSave 按路径回写：被移动/重命名的文档
+  // 若不先屏蔽旧路径，回写会在旧位置重建文件；操作成功后把当前文件与
+  // 编辑器会话切到新路径，失败则解除屏蔽，避免吞掉后续合法保存
+
+  /** 返回命中的当前打开文档路径：精确匹配，或（prefix 时）位于分组前缀内 */
+  const matchCurrentDoc = (from: string, prefix = false): string | null => {
+    if (!currentFile) {
+      return null;
+    }
+    if (currentFile === from) {
+      return currentFile;
+    }
+    return prefix && currentFile.startsWith(`${from}/`) ? currentFile : null;
+  };
+
+  /** 移动/重命名成功后把当前文档切换到新路径，并同步编辑器会话路径 */
+  const retargetCurrentDoc = (oldPath: string, newPath: string) => {
+    retargetDocEditorSessionPath(oldPath, newPath);
+    setCurrentTauriFile(newPath, currentFileType);
+  };
+
   // 当前文件有未保存修改时先自动保存，
   // 避免后续加载其他文件（打开/导出图片）覆盖丢失编辑
   const ensureCurrentFileSaved = async (): Promise<boolean> => {
@@ -207,58 +250,79 @@ export const TauriFilePanel = () => {
     }
   };
 
-  const handleOpenFile = async (path: string) => {
+  const handleOpenFile = async (path: string, ext: string) => {
     try {
       if (!(await ensureCurrentFileSaved())) {
         return;
       }
-      const content = await readTauriFile(path);
-      const { elements, viewport, theme } = parseTauriFileContent(content);
-      setCurrentTauriFile(path);
-      clearAndLoad(elements as PlaitElement[], viewport, theme);
+      const fileType = asFileType(ext);
+      setCurrentTauriFile(path, fileType);
+      if (fileType === 'drawnix') {
+        // Markdown/表格文件由文档编辑器自行加载，白板文件在这里直接载入画板
+        const content = await readTauriFile(path);
+        const { elements, viewport, theme } = parseTauriFileContent(content);
+        clearAndLoad(elements as PlaitElement[], viewport, theme);
+      }
     } catch (error) {
-      console.error('Failed to open drawnix file:', error);
+      console.error('Failed to open file:', error);
       showErrorToast(t('toast.tauriFile.loadFailed'));
     }
   };
 
-  const handleCreateFile = async (name: string, dirPath: string | null) => {
+  const handleCreateFile = async (
+    name: string,
+    dirPath: string | null,
+    fileType: TauriFileType,
+    options: CreateTauriFileOptions
+  ) => {
     try {
       const path = joinPath(dirPath, name);
-      await writeTauriFile(path, buildEmptyDrawnixContent());
-      setCurrentTauriFile(path);
-      clearAndLoad([]);
+      if (fileType === 'md') {
+        await writeTauriFile(path, buildEmptyMarkdownContent(), 'md');
+        setCurrentTauriFile(path, 'md');
+      } else if (fileType === 'table') {
+        await writeTauriFile(path, buildEmptyTableContent(options.rows, options.cols), 'table');
+        setCurrentTauriFile(path, 'table');
+      } else {
+        await writeTauriFile(path, buildEmptyDrawnixContent());
+        setCurrentTauriFile(path);
+        clearAndLoad([]);
+      }
+      notifyTauriFilesChanged();
       refreshTree();
     } catch (error) {
-      console.error('Failed to create drawnix file:', error);
+      console.error('Failed to create file:', error);
       showErrorToast(t('toast.tauriFile.saveFailed'));
     }
   };
 
-  // 另存为：把该文件内容通过系统保存对话框导出为 .drawnix 副本；
+  // 另存为：白板通过系统保存对话框导出 .drawnix 副本，Markdown 导出 .md 副本；
   // 另存当前文件时先自动保存，避免导出旧版本
-  const handleSaveFileAs = async (filePath: string) => {
+  const handleSaveFileAs = async (filePath: string, ext: string) => {
     try {
       if (!(await ensureCurrentFileSaved())) {
         return;
       }
-      const content = await readTauriFile(filePath);
-      const blob = new Blob([content], { type: MIME_TYPES.drawnix });
+      const fileType = asFileType(ext);
+      const content = await readTauriFile(filePath, fileType);
+      const blob = new Blob([content], {
+        type: fileType === 'md' ? MIME_TYPES.md : MIME_TYPES.drawnix,
+      });
       await fileSave(blob, {
         name: lastSeg(filePath),
-        extension: 'drawnix',
-        description: 'Drawnix file',
+        extension: fileType === 'md' ? 'md' : 'drawnix',
+        description: fileType === 'md' ? 'Markdown file' : 'Drawnix file',
       });
     } catch (error) {
       if ((error as { name?: string })?.name === 'AbortError') {
         return;
       }
-      console.error('Failed to save drawnix file as:', error);
+      console.error('Failed to save file as:', error);
       showErrorToast(t('toast.tauriFile.exportFailed'));
     }
   };
 
-  // 导出图片：非当前文件会先加载到画板再导出；有未保存修改时先自动保存
+  // 导出图片：仅白板文件支持；非当前文件会先加载到画板再导出；有未保存修改时先自动保存
   const handleExportImage = async (filePath: string, format: 'png' | 'svg') => {
     try {
       if (!(await ensureCurrentFileSaved())) {
@@ -282,21 +346,32 @@ export const TauriFilePanel = () => {
   };
 
   const handleDeleteFile = async () => {
-    const path = deleteTarget;
+    const target = deleteTarget;
     setDeleteTarget(null);
-    if (!path) {
+    if (!target) {
       return;
     }
     try {
-      await deleteTauriFile(path);
-      if (currentFile === path) {
+      // 当前打开的文档被删除时先屏蔽其自动保存，
+      // 否则文档编辑器卸载时的回写会把刚删除的文件重新创建出来
+      if (currentFile === target.path) {
+        suppressTauriFileSave(target.path);
+      }
+      await deleteTauriFile(target.path, asFileType(target.ext));
+      if (currentFile === target.path) {
         setCurrentTauriFile(null);
         clearAndLoad([]);
       }
       refreshTree();
       refreshTrash();
+      // 广播变更：白板中的引用卡片重新读取后进入“文件不存在”状态
+      notifyTauriFilesChanged();
     } catch (error) {
-      console.error('Failed to delete drawnix file:', error);
+      // 删除失败：恢复被屏蔽的自动保存，避免编辑器后续修改丢失
+      if (currentFile === target.path) {
+        resumeTauriFileSave(target.path);
+      }
+      console.error('Failed to delete file:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
     }
   };
@@ -309,10 +384,25 @@ export const TauriFilePanel = () => {
       return;
     }
     try {
+      // 分组内包含当前打开的文件时，同样先关闭文档并屏蔽自动保存
+      if (
+        currentFile &&
+        (currentFile === path || currentFile.startsWith(`${path}/`))
+      ) {
+        suppressTauriFileSave(currentFile);
+        setCurrentTauriFile(null);
+        clearAndLoad([]);
+      }
       await deleteTauriFolder(path);
       refreshTree();
       refreshTrash();
+      // 广播变更：分组内被引用的文件卡片重新读取后进入“文件不存在”状态
+      notifyTauriFilesChanged();
     } catch (error) {
+      // 删除失败：恢复被屏蔽的自动保存
+      if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
+        resumeTauriFileSave(currentFile);
+      }
       console.error('Failed to delete folder:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
     }
@@ -325,17 +415,41 @@ export const TauriFilePanel = () => {
     if (!target) {
       return;
     }
+    // 当前打开的文档（或其所在分组）被移动时，先屏蔽旧路径的自动保存回写，
+    // 否则编辑器防抖保存/卸载 flushSave 会把旧文件在旧位置重建出来
+    const docOldPath =
+      target.kind === 'file'
+        ? matchCurrentDoc(target.path)
+        : matchCurrentDoc(target.path, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     try {
       if (target.kind === 'file') {
-        await moveTauriFileToDir(target.path, targetDir);
-        if (currentFile === target.path) {
-          setCurrentTauriFile(joinPath(targetDir, lastSeg(target.path)));
+        const newPath = joinPath(targetDir, lastSeg(target.path));
+        await moveTauriFileToDir(target.path, targetDir, asFileType(target.ext));
+        // 同步白板中引用卡片的路径并广播刷新
+        syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
+        notifyTauriFilesChanged();
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, newPath);
         }
       } else {
+        const newPath = joinPath(targetDir, lastSeg(target.path));
         await moveTauriFolderToDir(target.path, targetDir);
+        // 分组路径变化，同步其下所有引用文件的路径前缀
+        syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
+        notifyTauriFilesChanged();
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(target.path.length)}`);
+        }
       }
       refreshTree();
     } catch (error) {
+      // 移动失败：恢复被屏蔽的自动保存
+      if (docOldPath) {
+        resumeTauriFileSave(docOldPath);
+      }
       console.error('Failed to move entry:', error);
       showErrorToast(t('toast.tauriFile.saveFailed'));
     }
@@ -347,6 +461,7 @@ export const TauriFilePanel = () => {
     try {
       await emptyTauriTrash();
       refreshTrash();
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to empty drawnix trash:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -358,6 +473,8 @@ export const TauriFilePanel = () => {
       await restoreTauriFile(trashFile);
       refreshTree();
       refreshTrash();
+      // 广播变更：被恢复文件的引用卡片重新读取到内容
+      notifyTauriFilesChanged();
     } catch (error) {
       console.error('Failed to restore drawnix file:', error);
       showErrorToast(t('toast.tauriFile.restoreFailed'));
@@ -403,10 +520,28 @@ export const TauriFilePanel = () => {
     if (!dirPath || !name || name === lastSeg(dirPath)) {
       return;
     }
+    const newPath = joinPath(parentOf(dirPath), name);
+    // 分组内包含当前打开的文档时，先屏蔽旧路径的自动保存回写
+    const docOldPath = matchCurrentDoc(dirPath, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     try {
       await renameTauriFolder(dirPath, name);
+      // 同步分组路径前缀下所有引用卡片并广播刷新
+      syncFileRefCardPaths(board, [
+        { from: dirPath, to: newPath },
+      ]);
+      notifyTauriFilesChanged();
+      if (docOldPath) {
+        retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(dirPath.length)}`);
+      }
       refreshTree();
     } catch (error) {
+      // 重命名失败：恢复被屏蔽的自动保存
+      if (docOldPath) {
+        resumeTauriFileSave(docOldPath);
+      }
       console.error('Failed to rename folder:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));
     }
@@ -414,20 +549,34 @@ export const TauriFilePanel = () => {
 
   const confirmRename = async () => {
     const oldPath = renamingFile;
+    const ext = renamingExt;
     const newName = normalizeTauriFileName(renameValue);
     cancelRename();
     if (!oldPath || !newName || newName === lastSeg(oldPath)) {
       return;
     }
     const newPath = joinPath(parentOf(oldPath), newName);
+    // 重命名当前打开的文档时屏蔽旧路径的自动保存，
+    // 避免编辑器重挂载的回写在旧路径重新创建文件
+    const isCurrentDoc = currentFile === oldPath;
+    if (isCurrentDoc) {
+      suppressTauriFileSave(oldPath);
+    }
     try {
-      await renameTauriFile(oldPath, newName);
-      if (currentFile === oldPath) {
-        setCurrentTauriFile(newPath);
+      await renameTauriFile(oldPath, newName, asFileType(ext));
+      // 同步白板中引用卡片的路径并广播刷新
+      syncFileRefCardPaths(board, [{ from: oldPath, to: newPath }]);
+      notifyTauriFilesChanged();
+      if (isCurrentDoc) {
+        retargetCurrentDoc(oldPath, newPath);
       }
       refreshTree();
     } catch (error) {
-      console.error('Failed to rename drawnix file:', error);
+      // 重命名失败：恢复被屏蔽的自动保存
+      if (isCurrentDoc) {
+        resumeTauriFileSave(oldPath);
+      }
+      console.error('Failed to rename file:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));
     }
   };
@@ -477,14 +626,36 @@ export const TauriFilePanel = () => {
       });
   };
 
-  const moveFile = (path: string, targetDir: string | null) => {
+  const moveFile = (path: string, targetDir: string | null, ext?: string) => {
     if (parentOf(path) === (targetDir ?? '')) {
       return;
     }
-    moveTauriFileToDir(path, targetDir)
-      .then(refreshTree)
+    const newPath = joinPath(targetDir, lastSeg(path));
+    const fileType = asFileType(ext);
+    // 与 handleMoveEntry 一致：拖拽移动当前打开的文档前屏蔽旧路径回写，
+    // 否则防抖保存/卸载 flushSave 会把旧文件在旧位置重建出来
+    const isCurrentDoc = currentFile === path;
+    if (isCurrentDoc) {
+      suppressTauriFileSave(path);
+    }
+    moveTauriFileToDir(path, targetDir, fileType)
+      .then(() => {
+        syncFileRefCardPaths(board, [
+          { from: path, to: newPath },
+        ]);
+        notifyTauriFilesChanged();
+        // 同步当前文件与编辑器会话到新路径，避免后续保存写回旧路径
+        if (isCurrentDoc) {
+          retargetCurrentDoc(path, newPath);
+        }
+        refreshTree();
+      })
       .catch((error) => {
-        console.error('Failed to move drawnix file:', error);
+        // 移动失败：恢复被屏蔽的自动保存
+        if (isCurrentDoc) {
+          resumeTauriFileSave(path);
+        }
+        console.error('Failed to move file:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));
       });
   };
@@ -494,9 +665,28 @@ export const TauriFilePanel = () => {
     if (parentOf(path) === target || target === path || target.startsWith(`${path}/`)) {
       return;
     }
+    const newPath = joinPath(targetDir, lastSeg(path));
+    // 分组内包含当前打开的文档时，先屏蔽旧路径的自动保存回写
+    const docOldPath = matchCurrentDoc(path, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     moveTauriFolderToDir(path, targetDir)
-      .then(refreshTree)
+      .then(() => {
+        syncFileRefCardPaths(board, [
+          { from: path, to: newPath },
+        ]);
+        notifyTauriFilesChanged();
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(path.length)}`);
+        }
+        refreshTree();
+      })
       .catch((error) => {
+        // 移动失败：恢复被屏蔽的自动保存
+        if (docOldPath) {
+          resumeTauriFileSave(docOldPath);
+        }
         console.error('Failed to move folder:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));
       });
@@ -516,7 +706,7 @@ export const TauriFilePanel = () => {
     }
     const dir = parentOf(targetPath);
     if (parentOf(dragged.id) !== dir) {
-      moveFile(dragged.id, dir);
+      moveFile(dragged.id, dir, dragged.ext);
       return;
     }
     const rest = orderedFilesIn(dir)
@@ -558,7 +748,7 @@ export const TauriFilePanel = () => {
       return;
     }
     if (dragged.type === 'file') {
-      moveFile(dragged.id, null);
+      moveFile(dragged.id, null, dragged.ext);
     } else {
       moveFolder(dragged.id, null);
     }
@@ -581,7 +771,8 @@ export const TauriFilePanel = () => {
     event: React.MouseEvent,
     kind: 'file' | 'folder',
     target: string,
-    trash: boolean
+    trash: boolean,
+    ext?: string
   ) => {
     event.preventDefault();
     event.stopPropagation();
@@ -594,6 +785,7 @@ export const TauriFilePanel = () => {
       target,
       trash,
       exportOpen: false,
+      ext,
     });
   };
 
@@ -607,14 +799,16 @@ export const TauriFilePanel = () => {
     action(target);
   };
 
-  const startRename = (filePath: string) => {
+  const startRename = (filePath: string, ext: string) => {
     setContextMenu(null);
     setRenamingFile(filePath);
+    setRenamingExt(ext);
     setRenameValue(lastSeg(filePath));
   };
 
   const cancelRename = () => {
     setRenamingFile(null);
+    setRenamingExt('');
     setRenameValue('');
   };
 
@@ -699,7 +893,9 @@ export const TauriFilePanel = () => {
   );
 
   // 文件项：普通态与重命名态
-  const renderFileItem = (path: string) => {
+  const renderFileItem = (file: TauriTreeFileEntry) => {
+    const path = file.path;
+    const ext = file.ext;
     const key = `file:${path}`;
     if (renamingFile === path) {
       return (
@@ -728,8 +924,8 @@ export const TauriFilePanel = () => {
         type="button"
         draggable
         onDragStart={(event) => {
-          setDragItem({ type: 'file', id: path });
-          setDragData(event, { type: 'file', id: path });
+          setDragItem({ type: 'file', id: path, ext });
+          setDragData(event, { type: 'file', id: path, ext });
         }}
         onDragEnd={resetDrag}
         onDrop={(event) => {
@@ -745,10 +941,15 @@ export const TauriFilePanel = () => {
             dragItem?.id === path && dragItem.type === 'file',
         })}
         title={path}
-        onClick={() => handleOpenFile(path)}
-        onContextMenu={(event) => handleItemContextMenu(event, 'file', path, false)}
+        onClick={() => handleOpenFile(path, ext)}
+        onContextMenu={(event) =>
+          handleItemContextMenu(event, 'file', path, false, ext)
+        }
       >
-        {lastSeg(path)}
+        <span className="tauri-file-panel__item-name">{lastSeg(path)}</span>
+        {ext !== 'drawnix' && (
+          <span className="tauri-file-panel__item-ext">{ext.toUpperCase()}</span>
+        )}
       </button>
     );
   };
@@ -819,7 +1020,7 @@ export const TauriFilePanel = () => {
         {expanded && (
           <div className="tauri-file-panel__tree-children">
             {orderedChildDirs(dirPath).map((d) => renderFolderRow(d.path))}
-            {orderedFilesIn(dirPath).map((f) => renderFileItem(f.path))}
+            {orderedFilesIn(dirPath).map((f) => renderFileItem(f))}
             {newFolderOpen && newFolderParent === dirPath && renderNewFolderInput()}
           </div>
         )}
@@ -830,7 +1031,7 @@ export const TauriFilePanel = () => {
   const renderDirChildren = (dir: string) => (
     <>
       {orderedChildDirs(dir).map((d) => renderFolderRow(d.path))}
-      {orderedFilesIn(dir).map((f) => renderFileItem(f.path))}
+      {orderedFilesIn(dir).map((f) => renderFileItem(f))}
     </>
   );
 
@@ -910,10 +1111,13 @@ export const TauriFilePanel = () => {
               className="tauri-file-panel__item"
               title={`${file.path} · ${new Date(file.deletedAt).toLocaleString()}`}
               onContextMenu={(event) =>
-                handleItemContextMenu(event, 'file', file.trashFile, true)
+                handleItemContextMenu(event, 'file', file.trashFile, true, file.ext)
               }
             >
-              {lastSeg(file.path)}
+              <span className="tauri-file-panel__item-name">{lastSeg(file.path)}</span>
+              {file.ext !== 'drawnix' && (
+                <span className="tauri-file-panel__item-ext">{file.ext.toUpperCase()}</span>
+              )}
             </button>
           ))}
       </div>
@@ -989,66 +1193,80 @@ export const TauriFilePanel = () => {
                 <button
                   type="button"
                   className="tauri-file-panel__context-item"
-                  onClick={() => startRename(contextMenu.target)}
+                  onClick={() =>
+                    startRename(contextMenu.target, contextMenu.ext ?? 'drawnix')
+                  }
                 >
                   {t('filePanel.rename')}
                 </button>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() => closeContextMenuAnd(handleSaveFileAs)}
-                >
-                  {t('filePanel.saveAs')}
-                </button>
-                <div
-                  className="tauri-file-panel__context-item-wrapper"
-                  onMouseEnter={() =>
-                    setContextMenu((cm) => cm && { ...cm, exportOpen: true })
-                  }
-                >
+                {contextMenu.ext !== 'table' && (
                   <button
                     type="button"
                     className="tauri-file-panel__context-item"
                     onClick={() =>
+                      closeContextMenuAnd((target) =>
+                        handleSaveFileAs(target, contextMenu.ext ?? 'drawnix')
+                      )
+                    }
+                  >
+                    {t('filePanel.saveAs')}
+                  </button>
+                )}
+                {contextMenu.ext === 'drawnix' && (
+                  <div
+                    className="tauri-file-panel__context-item-wrapper"
+                    onMouseEnter={() =>
                       setContextMenu((cm) => cm && { ...cm, exportOpen: true })
                     }
                   >
-                    {t('filePanel.exportImage')}
-                    <span className="tauri-file-panel__submenu-arrow">›</span>
-                  </button>
-                  {contextMenu.exportOpen && (
-                    <div className="tauri-file-panel__context-submenu">
-                      <button
-                        type="button"
-                        className="tauri-file-panel__context-item"
-                        onClick={() => {
-                          const { target } = contextMenu;
-                          setContextMenu(null);
-                          handleExportImage(target, 'png');
-                        }}
-                      >
-                        {t('menu.exportImage.png')}
-                      </button>
-                      <button
-                        type="button"
-                        className="tauri-file-panel__context-item"
-                        onClick={() => {
-                          const { target } = contextMenu;
-                          setContextMenu(null);
-                          handleExportImage(target, 'svg');
-                        }}
-                      >
-                        {t('menu.exportImage.svg')}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    <button
+                      type="button"
+                      className="tauri-file-panel__context-item"
+                      onClick={() =>
+                        setContextMenu((cm) => cm && { ...cm, exportOpen: true })
+                      }
+                    >
+                      {t('filePanel.exportImage')}
+                      <span className="tauri-file-panel__submenu-arrow">›</span>
+                    </button>
+                    {contextMenu.exportOpen && (
+                      <div className="tauri-file-panel__context-submenu">
+                        <button
+                          type="button"
+                          className="tauri-file-panel__context-item"
+                          onClick={() => {
+                            const { target } = contextMenu;
+                            setContextMenu(null);
+                            handleExportImage(target, 'png');
+                          }}
+                        >
+                          {t('menu.exportImage.png')}
+                        </button>
+                        <button
+                          type="button"
+                          className="tauri-file-panel__context-item"
+                          onClick={() => {
+                            const { target } = contextMenu;
+                            setContextMenu(null);
+                            handleExportImage(target, 'svg');
+                          }}
+                        >
+                          {t('menu.exportImage.svg')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
                   className="tauri-file-panel__context-item"
                   onClick={() =>
                     closeContextMenuAnd((target) =>
-                      setMoveTarget({ kind: 'file', path: target })
+                      setMoveTarget({
+                        kind: 'file',
+                        path: target,
+                        ext: contextMenu.ext ?? 'drawnix',
+                      })
                     )
                   }
                 >
@@ -1057,7 +1275,14 @@ export const TauriFilePanel = () => {
                 <button
                   type="button"
                   className="tauri-file-panel__context-item tauri-file-panel__context-item--danger"
-                  onClick={() => closeContextMenuAnd((target) => setDeleteTarget(target))}
+                  onClick={() =>
+                    closeContextMenuAnd((target) =>
+                      setDeleteTarget({
+                        path: target,
+                        ext: contextMenu.ext ?? 'drawnix',
+                      })
+                    )
+                  }
                 >
                   {t('filePanel.delete')}
                 </button>

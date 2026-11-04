@@ -106,3 +106,245 @@
     }
   }
 }
+
+// 文件引用卡片：只读渲染 Markdown/表格源文件内容，
+// 所有内容均不响应指针事件，点击/双击穿透到卡片本身交给白板处理
+.drawnix-file-ref-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 13px;
+  color: #1a1a1a;
+  font-family: inherit;
+
+  &__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eceef1;
+  }
+
+  &__badge {
+    flex: none;
+    font-size: 10px;
+    line-height: 1;
+    padding: 3px 5px;
+    border-radius: 3px;
+    background: #eef1f6;
+    color: #4a4f5a;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  &__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__hint {
+    flex: none;
+    font-size: 11px;
+    color: #b6bac2;
+  }
+
+  &__placeholder {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #8a8f99;
+    text-align: center;
+    padding: 8px;
+  }
+
+  &__missing {
+    font-size: 13px;
+    color: #c25450;
+  }
+
+  &__path {
+    max-width: 100%;
+    font-size: 11px;
+    color: #b6bac2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    // 内容区可交互：滚动条可拖动、Markdown 任务复选框可点击；
+    // pointerdown 由组件内阻止冒泡，避免拖动内容时误拖白板元素
+    pointer-events: auto;
+  }
+
+  &__table {
+    // 宽度由内联样式按表格实际设定宽度（px）设置，
+    // 不随卡片宽度缩放，超出部分由内容区滚动；
+    // fixed 布局保证列宽严格按 colgroup 生效
+    table-layout: fixed;
+    border-collapse: collapse;
+
+    // 默认边框与表格编辑器一致；单元格单独设置 border 时由内联样式覆盖
+    td {
+      border: 1px solid #b4b4b4;
+      padding: 4px 6px;
+      overflow: hidden;
+      word-break: break-word;
+    }
+  }
+
+  // Markdown 渲染排版（与文档编辑器预览一致的常用元素样式，字号略小）
+  &__markdown {
+    font-size: 13px;
+    line-height: 1.65;
+    word-break: break-word;
+
+    > :first-child {
+      margin-top: 0;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin: 1em 0 0.5em;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    h1 {
+      font-size: 1.5em;
+    }
+
+    h2 {
+      font-size: 1.3em;
+    }
+
+    h3 {
+      font-size: 1.15em;
+    }
+
+    h4,
+    h5,
+    h6 {
+      font-size: 1em;
+    }
+
+    p {
+      margin: 0.5em 0;
+    }
+
+    ul,
+    ol {
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+
+    li {
+      margin: 0.15em 0;
+    }
+
+    ul:has(> li > input[type='checkbox']) {
+      list-style: none;
+      padding-left: 0.6em;
+    }
+
+    li > input[type='checkbox'] {
+      margin: 0 0.4em 0 0;
+      vertical-align: middle;
+      accent-color: var(--color-primary, #4a90e2);
+      cursor: pointer;
+    }
+
+    blockquote {
+      margin: 0.6em 0;
+      padding: 0.2em 0.8em;
+      border-left: 3px solid var(--color-gray-30, #c0c0c0);
+      color: #6b7078;
+
+      p {
+        margin: 0.25em 0;
+      }
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace;
+      font-size: 0.9em;
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      background: #f0f1f4;
+    }
+
+    pre {
+      margin: 0.6em 0;
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: #f0f1f4;
+      overflow: auto;
+
+      code {
+        padding: 0;
+        background: transparent;
+        font-size: 12px;
+      }
+    }
+
+    a {
+      color: var(--color-primary, #4a90e2);
+    }
+
+    img {
+      max-width: 100%;
+    }
+
+    hr {
+      margin: 1em 0;
+      border: none;
+      border-top: 1px solid #eceef1;
+    }
+
+    table {
+      margin: 0.6em 0;
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid #e3e5ea;
+      padding: 4px 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #f5f6f8;
+      font-weight: 600;
+    }
+  }
+}
