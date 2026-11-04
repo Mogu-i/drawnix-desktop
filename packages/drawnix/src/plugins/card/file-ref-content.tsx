@@ -142,7 +142,8 @@ export const FileRefCardContent: React.FC<{ element: CardElement }> = ({ element
       if (!table) {
         return <div className="drawnix-file-ref-card__placeholder">{t('card.fileRef.loading')}</div>;
       }
-      // 列宽按源文件比例折算为百分比，表格随卡片宽度自适应排版
+      // 列宽按源文件设定值以 px 渲染，表格宽度与编辑器中实际设定宽度一致，
+      // 不随卡片宽度缩放；超出卡片宽度的部分由内容区滚动查看
       const colWidths = getTableColWidths(table.colWidths, table.cols);
       const rowHeights = getTableRowHeights(table.rowHeights, table.rows);
       const totalWidth = colWidths.reduce((sum, width) => sum + width, 0) || 1;
@@ -151,10 +152,14 @@ export const FileRefCardContent: React.FC<{ element: CardElement }> = ({ element
           className="drawnix-file-ref-card__body"
           onPointerDown={stopPointerDown}
         >
-          <table className="drawnix-file-ref-card__table" cellPadding={0}>
+          <table
+            className="drawnix-file-ref-card__table"
+            style={{ width: `${totalWidth}px` }}
+            cellPadding={0}
+          >
             <colgroup>
               {colWidths.map((width, c) => (
-                <col key={c} style={{ width: `${(width / totalWidth) * 100}%` }} />
+                <col key={c} style={{ width: `${width}px` }} />
               ))}
             </colgroup>
             <tbody>

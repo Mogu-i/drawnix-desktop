@@ -198,7 +198,9 @@
   }
 
   &__table {
-    width: 100%;
+    // 宽度由内联样式按表格实际设定宽度（px）设置，
+    // 不随卡片宽度缩放，超出部分由内容区滚动；
+    // fixed 布局保证列宽严格按 colgroup 生效
     table-layout: fixed;
     border-collapse: collapse;
 
