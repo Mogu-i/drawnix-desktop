@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   DATA_DIR_CHANGED_EVENT,
   TAURI_FILES_CHANGED_EVENT,
+  isTauriFileSaveSuppressed,
   TableFileData,
   notifyTauriFilesChanged,
   parseTableFileContent,
@@ -108,6 +109,12 @@ export const FileRefCardContent: React.FC<{ element: CardElement }> = ({ element
     }
     const index = Number(target.dataset.taskIndex);
     if (Number.isNaN(index) || markdown === null) {
+      return;
+    }
+    // 文件已被删除/移动/重命名（旧路径保存被屏蔽）时不再回写，
+    // 避免把旧文件在旧位置重新创建出来；回滚勾选状态，等待卡片按新路径重载
+    if (isTauriFileSaveSuppressed(filePath)) {
+      target.checked = !target.checked;
       return;
     }
     const next = toggleTaskItem(markdown, index);

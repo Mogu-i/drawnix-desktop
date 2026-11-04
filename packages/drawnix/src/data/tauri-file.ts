@@ -255,6 +255,11 @@ export const setCurrentTauriFile = (
   if (docEditorSession && name !== docEditorSession.docPath) {
     docEditorSession = null;
   }
+  // 打开文件时解除该路径的历史保存屏蔽（如旧路径曾删除/移动后重建同名文件），
+  // 避免残留屏蔽静默丢弃新文件的保存
+  if (name) {
+    resumeTauriFileSave(name);
+  }
   suppressDirtyUntil = Date.now() + 500;
   setState({ currentFile: name, fileType, dirty: false });
 };
@@ -393,6 +398,13 @@ export const saveToTauriFile = async (board: PlaitBoard, path?: string): Promise
   if (!filePath) {
     throw new Error('no tauri file opened');
   }
+  // 文件已被删除/移动/重命名（旧路径保存被屏蔽）时跳过回写，
+  // 只清脏标记，避免把旧文件在旧位置重新创建出来
+  if (isTauriFileSaveSuppressed(filePath)) {
+    suppressDirtyUntil = Date.now() + 500;
+    setState({ dirty: false });
+    return filePath;
+  }
   // 当前打开的是 Markdown/表格文件时，画板内容与其无关，
   // 只清除脏标记，避免把画板 JSON 写入文档文件导致内容损坏
   if (state.fileType !== 'drawnix') {
@@ -447,5 +459,16 @@ export const closeTauriDocEditor = () => {
     setCurrentTauriFile(session.returnFile.path, session.returnFile.fileType);
   } else {
     setCurrentTauriFile(null);
+  }
+};
+
+/**
+ * 文档编辑器会话中的文档被移动/重命名后同步会话路径；
+ * 否则 setCurrentTauriFile(newPath) 会因路径不匹配丢弃会话，
+ * 关闭编辑器后无法恢复白板上下文
+ */
+export const retargetDocEditorSessionPath = (from: string, to: string) => {
+  if (docEditorSession?.docPath === from) {
+    docEditorSession = { ...docEditorSession, docPath: to };
   }
 };

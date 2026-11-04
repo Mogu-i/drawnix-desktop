@@ -40,6 +40,8 @@ import {
   renameTauriFile,
   renameTauriFolder,
   reorderTauriItems,
+  resumeTauriFileSave,
+  retargetDocEditorSessionPath,
   restoreTauriFile,
   saveToTauriFile,
   setCurrentTauriFile,
@@ -210,6 +212,28 @@ export const TauriFilePanel = () => {
     showToast({ message });
   };
 
+  // ----- 移动/重命名对当前打开文档的保护 -----
+  // 文档编辑器的防抖保存与卸载 flushSave 按路径回写：被移动/重命名的文档
+  // 若不先屏蔽旧路径，回写会在旧位置重建文件；操作成功后把当前文件与
+  // 编辑器会话切到新路径，失败则解除屏蔽，避免吞掉后续合法保存
+
+  /** 返回命中的当前打开文档路径：精确匹配，或（prefix 时）位于分组前缀内 */
+  const matchCurrentDoc = (from: string, prefix = false): string | null => {
+    if (!currentFile) {
+      return null;
+    }
+    if (currentFile === from) {
+      return currentFile;
+    }
+    return prefix && currentFile.startsWith(`${from}/`) ? currentFile : null;
+  };
+
+  /** 移动/重命名成功后把当前文档切换到新路径，并同步编辑器会话路径 */
+  const retargetCurrentDoc = (oldPath: string, newPath: string) => {
+    retargetDocEditorSessionPath(oldPath, newPath);
+    setCurrentTauriFile(newPath, currentFileType);
+  };
+
   // 当前文件有未保存修改时先自动保存，
   // 避免后续加载其他文件（打开/导出图片）覆盖丢失编辑
   const ensureCurrentFileSaved = async (): Promise<boolean> => {
@@ -343,6 +367,10 @@ export const TauriFilePanel = () => {
       // 广播变更：白板中的引用卡片重新读取后进入“文件不存在”状态
       notifyTauriFilesChanged();
     } catch (error) {
+      // 删除失败：恢复被屏蔽的自动保存，避免编辑器后续修改丢失
+      if (currentFile === target.path) {
+        resumeTauriFileSave(target.path);
+      }
       console.error('Failed to delete file:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
     }
@@ -371,6 +399,10 @@ export const TauriFilePanel = () => {
       // 广播变更：分组内被引用的文件卡片重新读取后进入“文件不存在”状态
       notifyTauriFilesChanged();
     } catch (error) {
+      // 删除失败：恢复被屏蔽的自动保存
+      if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
+        resumeTauriFileSave(currentFile);
+      }
       console.error('Failed to delete folder:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
     }
@@ -383,19 +415,24 @@ export const TauriFilePanel = () => {
     if (!target) {
       return;
     }
+    // 当前打开的文档（或其所在分组）被移动时，先屏蔽旧路径的自动保存回写，
+    // 否则编辑器防抖保存/卸载 flushSave 会把旧文件在旧位置重建出来
+    const docOldPath =
+      target.kind === 'file'
+        ? matchCurrentDoc(target.path)
+        : matchCurrentDoc(target.path, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     try {
       if (target.kind === 'file') {
         const newPath = joinPath(targetDir, lastSeg(target.path));
-        // 移动当前打开的文档时屏蔽旧路径的自动保存，避免回写重建旧文件
-        if (currentFile === target.path) {
-          suppressTauriFileSave(target.path);
-        }
         await moveTauriFileToDir(target.path, targetDir, asFileType(target.ext));
         // 同步白板中引用卡片的路径并广播刷新
         syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
         notifyTauriFilesChanged();
-        if (currentFile === target.path) {
-          setCurrentTauriFile(newPath, currentFileType);
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, newPath);
         }
       } else {
         const newPath = joinPath(targetDir, lastSeg(target.path));
@@ -403,9 +440,16 @@ export const TauriFilePanel = () => {
         // 分组路径变化，同步其下所有引用文件的路径前缀
         syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
         notifyTauriFilesChanged();
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(target.path.length)}`);
+        }
       }
       refreshTree();
     } catch (error) {
+      // 移动失败：恢复被屏蔽的自动保存
+      if (docOldPath) {
+        resumeTauriFileSave(docOldPath);
+      }
       console.error('Failed to move entry:', error);
       showErrorToast(t('toast.tauriFile.saveFailed'));
     }
@@ -476,15 +520,28 @@ export const TauriFilePanel = () => {
     if (!dirPath || !name || name === lastSeg(dirPath)) {
       return;
     }
+    const newPath = joinPath(parentOf(dirPath), name);
+    // 分组内包含当前打开的文档时，先屏蔽旧路径的自动保存回写
+    const docOldPath = matchCurrentDoc(dirPath, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     try {
       await renameTauriFolder(dirPath, name);
       // 同步分组路径前缀下所有引用卡片并广播刷新
       syncFileRefCardPaths(board, [
-        { from: dirPath, to: joinPath(parentOf(dirPath), name) },
+        { from: dirPath, to: newPath },
       ]);
       notifyTauriFilesChanged();
+      if (docOldPath) {
+        retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(dirPath.length)}`);
+      }
       refreshTree();
     } catch (error) {
+      // 重命名失败：恢复被屏蔽的自动保存
+      if (docOldPath) {
+        resumeTauriFileSave(docOldPath);
+      }
       console.error('Failed to rename folder:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));
     }
@@ -499,21 +556,26 @@ export const TauriFilePanel = () => {
       return;
     }
     const newPath = joinPath(parentOf(oldPath), newName);
+    // 重命名当前打开的文档时屏蔽旧路径的自动保存，
+    // 避免编辑器重挂载的回写在旧路径重新创建文件
+    const isCurrentDoc = currentFile === oldPath;
+    if (isCurrentDoc) {
+      suppressTauriFileSave(oldPath);
+    }
     try {
-      // 重命名当前打开的文档时屏蔽旧路径的自动保存，
-      // 避免编辑器重挂载的回写在旧路径重新创建文件
-      if (currentFile === oldPath) {
-        suppressTauriFileSave(oldPath);
-      }
       await renameTauriFile(oldPath, newName, asFileType(ext));
       // 同步白板中引用卡片的路径并广播刷新
       syncFileRefCardPaths(board, [{ from: oldPath, to: newPath }]);
       notifyTauriFilesChanged();
-      if (currentFile === oldPath) {
-        setCurrentTauriFile(newPath, currentFileType);
+      if (isCurrentDoc) {
+        retargetCurrentDoc(oldPath, newPath);
       }
       refreshTree();
     } catch (error) {
+      // 重命名失败：恢复被屏蔽的自动保存
+      if (isCurrentDoc) {
+        resumeTauriFileSave(oldPath);
+      }
       console.error('Failed to rename file:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));
     }
@@ -568,15 +630,31 @@ export const TauriFilePanel = () => {
     if (parentOf(path) === (targetDir ?? '')) {
       return;
     }
-    moveTauriFileToDir(path, targetDir, asFileType(ext))
+    const newPath = joinPath(targetDir, lastSeg(path));
+    const fileType = asFileType(ext);
+    // 与 handleMoveEntry 一致：拖拽移动当前打开的文档前屏蔽旧路径回写，
+    // 否则防抖保存/卸载 flushSave 会把旧文件在旧位置重建出来
+    const isCurrentDoc = currentFile === path;
+    if (isCurrentDoc) {
+      suppressTauriFileSave(path);
+    }
+    moveTauriFileToDir(path, targetDir, fileType)
       .then(() => {
         syncFileRefCardPaths(board, [
-          { from: path, to: joinPath(targetDir, lastSeg(path)) },
+          { from: path, to: newPath },
         ]);
         notifyTauriFilesChanged();
+        // 同步当前文件与编辑器会话到新路径，避免后续保存写回旧路径
+        if (isCurrentDoc) {
+          retargetCurrentDoc(path, newPath);
+        }
         refreshTree();
       })
       .catch((error) => {
+        // 移动失败：恢复被屏蔽的自动保存
+        if (isCurrentDoc) {
+          resumeTauriFileSave(path);
+        }
         console.error('Failed to move file:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));
       });
@@ -587,15 +665,28 @@ export const TauriFilePanel = () => {
     if (parentOf(path) === target || target === path || target.startsWith(`${path}/`)) {
       return;
     }
+    const newPath = joinPath(targetDir, lastSeg(path));
+    // 分组内包含当前打开的文档时，先屏蔽旧路径的自动保存回写
+    const docOldPath = matchCurrentDoc(path, true);
+    if (docOldPath) {
+      suppressTauriFileSave(docOldPath);
+    }
     moveTauriFolderToDir(path, targetDir)
       .then(() => {
         syncFileRefCardPaths(board, [
-          { from: path, to: joinPath(targetDir, lastSeg(path)) },
+          { from: path, to: newPath },
         ]);
         notifyTauriFilesChanged();
+        if (docOldPath) {
+          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(path.length)}`);
+        }
         refreshTree();
       })
       .catch((error) => {
+        // 移动失败：恢复被屏蔽的自动保存
+        if (docOldPath) {
+          resumeTauriFileSave(docOldPath);
+        }
         console.error('Failed to move folder:', error);
         showErrorToast(t('toast.tauriFile.saveFailed'));
       });
