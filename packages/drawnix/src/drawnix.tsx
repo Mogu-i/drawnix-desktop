@@ -47,6 +47,7 @@ import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
 import { Toast, useToast } from './components/toast/toast';
 import { withCard, migrateLegacyBoardData } from './plugins/card/with-card';
+import { withTextSelection } from './plugins/with-text-selection';
 import { TauriFilePanel } from './components/tauri-file-panel/tauri-file-panel';
 import { WelcomePage } from './components/welcome-page/welcome-page';
 import { DocEditor } from './components/doc-editor/doc-editor';
@@ -230,6 +231,8 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     withMindExtend,
     withCard,
     withCommonPlugin,
+    // 拖拽期间禁止浏览器原生文本选中（拖动卡片/形状/框选时误选中其他内容）
+    withTextSelection,
     buildDrawnixHotkeyPlugin(updateAppState),
     withFreehand,
     buildPencilPlugin(updateAppState),

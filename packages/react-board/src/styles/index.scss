@@ -95,6 +95,13 @@
         user-select: none;
     }
 
+    // 白板拖拽期间（移动元素/框选/缩放等，类由 drawnix 的 with-text-selection 插件
+    // 在 pointerdown ~ pointerup 间维护）禁止原生文本选中，避免拖拽划过卡片、形状
+    // 等内容区时出现浏览器文本选区；编辑场景按下的是 contentEditable，不会加此类
+    &.text-selection-suppressed {
+        user-select: none;
+    }
+
     .board-active-svg {
         position: absolute;
         left: 0;
