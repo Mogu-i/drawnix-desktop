@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   clearTauriFileDirty,
+  isTauriFileSaveSuppressed,
   markTauriFileDirty,
+  resumeTauriFileSave,
   writeTauriFile,
 } from '../../data/tauri-file';
 import { useDrawnix } from '../../hooks/use-drawnix';
@@ -29,6 +31,10 @@ export const useDocAutoSave = (
     if (!loadedRef.current) {
       return;
     }
+    // 文件已被删除/改名/移动时禁止回写，避免把旧文件重新创建出来
+    if (isTauriFileSaveSuppressed(path)) {
+      return;
+    }
     const content = serialize();
     if (content === null) {
       return;
@@ -52,8 +58,10 @@ export const useDocAutoSave = (
   }, [flushSave]);
 
   const markLoaded = useCallback(() => {
+    // 重新打开同名路径的文件（如删除后重建）时恢复自动保存
+    resumeTauriFileSave(path);
     loadedRef.current = true;
-  }, []);
+  }, [path]);
 
   // 卸载（关闭/切换文件）时立即保存未落盘的修改
   useEffect(() => {

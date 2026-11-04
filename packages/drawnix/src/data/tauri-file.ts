@@ -266,6 +266,24 @@ export const suppressTauriDirty = (durationMs = 500) => {
   suppressDirtyUntil = Date.now() + durationMs;
 };
 
+/**
+ * 已删除/已改名/已移动文件的保存屏蔽表：文档编辑器卸载时会立即回写文件，
+ * 若文件已被删除或挪走，回写会把旧文件重新创建出来，这里按路径屏蔽保存
+ */
+const saveSuppressedPaths = new Set<string>();
+
+export const suppressTauriFileSave = (path: string) => {
+  saveSuppressedPaths.add(path);
+};
+
+/** 重新打开同名路径的文件时恢复自动保存 */
+export const resumeTauriFileSave = (path: string) => {
+  saveSuppressedPaths.delete(path);
+};
+
+export const isTauriFileSaveSuppressed = (path: string) =>
+  saveSuppressedPaths.has(path);
+
 export const buildEmptyDrawnixContent = (): string => {
   return JSON.stringify(
     {

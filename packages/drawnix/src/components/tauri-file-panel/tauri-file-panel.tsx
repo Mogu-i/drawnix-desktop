@@ -43,6 +43,7 @@ import {
   saveToTauriFile,
   setCurrentTauriFile,
   suppressTauriDirty,
+  suppressTauriFileSave,
   useTauriFileState,
   writeTauriFile,
 } from '../../data/tauri-file';
@@ -324,6 +325,11 @@ export const TauriFilePanel = () => {
       return;
     }
     try {
+      // 当前打开的文档被删除时先屏蔽其自动保存，
+      // 否则文档编辑器卸载时的回写会把刚删除的文件重新创建出来
+      if (currentFile === target.path) {
+        suppressTauriFileSave(target.path);
+      }
       await deleteTauriFile(target.path, asFileType(target.ext));
       if (currentFile === target.path) {
         setCurrentTauriFile(null);
@@ -345,6 +351,15 @@ export const TauriFilePanel = () => {
       return;
     }
     try {
+      // 分组内包含当前打开的文件时，同样先关闭文档并屏蔽自动保存
+      if (
+        currentFile &&
+        (currentFile === path || currentFile.startsWith(`${path}/`))
+      ) {
+        suppressTauriFileSave(currentFile);
+        setCurrentTauriFile(null);
+        clearAndLoad([]);
+      }
       await deleteTauriFolder(path);
       refreshTree();
       refreshTrash();
@@ -363,6 +378,10 @@ export const TauriFilePanel = () => {
     }
     try {
       if (target.kind === 'file') {
+        // 移动当前打开的文档时屏蔽旧路径的自动保存，避免回写重建旧文件
+        if (currentFile === target.path) {
+          suppressTauriFileSave(target.path);
+        }
         await moveTauriFileToDir(target.path, targetDir, asFileType(target.ext));
         if (currentFile === target.path) {
           setCurrentTauriFile(
@@ -461,6 +480,11 @@ export const TauriFilePanel = () => {
     }
     const newPath = joinPath(parentOf(oldPath), newName);
     try {
+      // 重命名当前打开的文档时屏蔽旧路径的自动保存，
+      // 避免编辑器重挂载的回写在旧路径重新创建文件
+      if (currentFile === oldPath) {
+        suppressTauriFileSave(oldPath);
+      }
       await renameTauriFile(oldPath, newName, asFileType(ext));
       if (currentFile === oldPath) {
         setCurrentTauriFile(newPath, currentFileType);
