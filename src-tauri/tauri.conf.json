@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Drawnix-desktop",
-  "version": "0.0.1",
-  "identifier": "com.drawnix.app",
+  "productName": "Sihua",
+  "version": "0.0.2",
+  "identifier": "sihua",
   "build": {
     "frontendDist": "../dist/apps/web",
     "devUrl": "http://localhost:7200",
