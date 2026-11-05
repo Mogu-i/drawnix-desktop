@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import {
   TableFileData,
@@ -197,6 +197,10 @@ export const TableEditor = ({ path }: { path: string }) => {
   } | null>(null);
   // 表格容器：接收键盘导航事件（tabIndex 聚焦）
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  // 拖拽手柄定位基准：行/列声明尺寸只是最小值，内容（换行/字号/padding）
+  // 撑高时浏览器会把行实际渲染得更高，手柄必须按 DOM 实测边界定位才会与边框对齐
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [measured, setMeasured] = useState<{ rows: number[]; cols: number[] } | null>(null);
 
   const serialize = useCallback(
     () => (dataRef.current ? JSON.stringify(dataRef.current, null, 2) : null),
@@ -569,11 +573,24 @@ export const TableEditor = ({ path }: { path: string }) => {
       colWidths: getTableColWidths(data.colWidths, data.cols),
       rowHeights: getTableRowHeights(data.rowHeights, data.rows),
     };
+    // 起始尺寸取 DOM 实测值：内容撑高的行渲染高度大于声明值时，
+    // 从声明值起拖会让手柄瞬间跳离鼠标位置
+    const sameShape =
+      measured && measured.rows.length === sizes.rowHeights.length &&
+      measured.cols.length === sizes.colWidths.length;
+    const startSizes =
+      type === 'col'
+        ? sameShape
+          ? measured!.cols.map((b, i) => b - (i > 0 ? measured!.cols[i - 1] : 0))
+          : sizes.colWidths
+        : sameShape
+          ? measured!.rows.map((b, i) => b - (i > 0 ? measured!.rows[i - 1] : 0))
+          : sizes.rowHeights;
     resizeRef.current = {
       type,
       index,
       startPos: type === 'col' ? event.clientX : event.clientY,
-      startSize: type === 'col' ? sizes.colWidths[index] : sizes.rowHeights[index],
+      startSize: startSizes[index],
     };
     previewRef.current = sizes;
     setResizing(true);
@@ -626,6 +643,54 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [resizing, commit]);
 
+  // 从 DOM 实测各行下边界/各列右边界（相对表格左上角）；
+  // 与上次结果一致时保持原引用，避免 ResizeObserver 回调 setState 引发自激循环
+  const measureBoundaries = useCallback(() => {
+    const table = tableRef.current;
+    if (!table) {
+      return;
+    }
+    const base = table.getBoundingClientRect();
+    const rows: number[] = [];
+    table.querySelectorAll('tbody > tr').forEach((tr) => {
+      rows.push(tr.getBoundingClientRect().bottom - base.top);
+    });
+    const cols: number[] = [];
+    table.querySelectorAll('colgroup > col').forEach((col) => {
+      cols.push(col.getBoundingClientRect().right - base.left);
+    });
+    setMeasured((prev) => {
+      if (
+        prev &&
+        prev.rows.length === rows.length &&
+        prev.cols.length === cols.length &&
+        prev.rows.every((v, i) => Math.abs(v - rows[i]) < 0.5) &&
+        prev.cols.every((v, i) => Math.abs(v - cols[i]) < 0.5)
+      ) {
+        return prev;
+      }
+      return { rows, cols };
+    });
+  }, []);
+
+  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐
+  useLayoutEffect(() => {
+    measureBoundaries();
+  }, [data, resizePreview, measureBoundaries]);
+
+  // 字体加载、窗口缩放等异步回流导致的行高变化由 ResizeObserver 兜底重新测量
+  useEffect(() => {
+    const table = tableRef.current;
+    if (!table || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(() => measureBoundaries());
+    observer.observe(table);
+    return () => {
+      observer.disconnect();
+    };
+  }, [data, measureBoundaries]);
+
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
   }
@@ -637,12 +702,19 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 拖拽调整过程中使用预览尺寸，否则使用已保存的尺寸
   const colWidths = resizePreview?.colWidths ?? getTableColWidths(data.colWidths, data.cols);
   const rowHeights = resizePreview?.rowHeights ?? getTableRowHeights(data.rowHeights, data.rows);
-  const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
-  const tableHeight = rowHeights.reduce((sum, height) => sum + height, 0);
   const colOffsets = [0];
   colWidths.forEach((width) => colOffsets.push(colOffsets[colOffsets.length - 1] + width));
   const rowOffsets = [0];
   rowHeights.forEach((height) => rowOffsets.push(rowOffsets[rowOffsets.length - 1] + height));
+  // 手柄定位优先用 DOM 实测边界（行数/列数与当前数据一致时），声明尺寸累加值仅作首帧兜底，
+  // 否则内容把行撑高后手柄仍停留在声明高度处，与表格边框错位
+  const sameShape =
+    !!measured && measured.rows.length === rowHeights.length &&
+    measured.cols.length === colWidths.length;
+  const rowBounds = sameShape ? measured.rows : rowOffsets.slice(1);
+  const colBounds = sameShape ? measured.cols : colOffsets.slice(1);
+  const tableWidth = colBounds[colBounds.length - 1] ?? colOffsets[colOffsets.length - 1];
+  const tableHeight = rowBounds[rowBounds.length - 1] ?? rowOffsets[rowOffsets.length - 1];
 
   // 当前选区首个单元格的样式，用于工具栏按钮高亮
   const firstCell = data.cells[rect?.r1 ?? 0]?.[rect?.c1 ?? 0];
@@ -825,7 +897,7 @@ export const TableEditor = ({ path }: { path: string }) => {
               : undefined
           }
         >
-          <table className="table-editor__table" cellPadding={0}>
+          <table ref={tableRef} className="table-editor__table" cellPadding={0}>
             <colgroup>
               {colWidths.map((width, c) => (
                 <col key={c} style={{ width: `${width}px` }} />
@@ -907,7 +979,7 @@ export const TableEditor = ({ path }: { path: string }) => {
             <div
               key={`col-${c}`}
               className="table-editor__resize-handle table-editor__resize-handle--col"
-              style={{ left: colOffsets[c + 1] - 4, height: tableHeight }}
+              style={{ left: colBounds[c] - 4, height: tableHeight }}
               onMouseDown={(event) => startResize('col', c, event)}
             />
           ))}
@@ -916,7 +988,7 @@ export const TableEditor = ({ path }: { path: string }) => {
             <div
               key={`row-${r}`}
               className="table-editor__resize-handle table-editor__resize-handle--row"
-              style={{ top: rowOffsets[r + 1] - 4, width: tableWidth }}
+              style={{ top: rowBounds[r] - 4, width: tableWidth }}
               onMouseDown={(event) => startResize('row', r, event)}
             />
           ))}
