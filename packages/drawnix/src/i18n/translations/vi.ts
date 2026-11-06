@@ -158,6 +158,7 @@ const viTranslations: Translations = {
   'filePanel.emptyTrash': 'Dọn thùng rác',
 
   // New file dialog: file types
+  'filePanel.fileName': 'Tên tệp',
   'filePanel.fileType': 'Loại tệp',
   'filePanel.fileType.drawnix': 'Bảng vẽ',
   'filePanel.fileType.md': 'Markdown',

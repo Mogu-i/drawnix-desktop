@@ -158,6 +158,7 @@ const zhTranslations: Translations = {
   'filePanel.emptyTrash': '清空回收站',
 
   // New file dialog: file types
+  'filePanel.fileName': '文件名',
   'filePanel.fileType': '文件类型',
   'filePanel.fileType.drawnix': '白板',
   'filePanel.fileType.md': 'Markdown',

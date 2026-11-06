@@ -157,6 +157,7 @@ const arTranslations: Translations = {
   'filePanel.emptyTrash': 'تفريغ المحذوفات',
 
   // New file dialog: file types
+  'filePanel.fileName': 'اسم الملف',
   'filePanel.fileType': 'نوع الملف',
   'filePanel.fileType.drawnix': 'سبورة',
   'filePanel.fileType.md': 'Markdown',

@@ -159,6 +159,7 @@ const ruTranslations: Translations = {
   'filePanel.emptyTrash': 'Очистить корзину',
 
   // New file dialog: file types
+  'filePanel.fileName': 'Имя файла',
   'filePanel.fileType': 'Тип файла',
   'filePanel.fileType.drawnix': 'Доска',
   'filePanel.fileType.md': 'Markdown',

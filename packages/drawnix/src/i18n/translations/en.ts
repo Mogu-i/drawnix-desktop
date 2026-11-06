@@ -156,6 +156,7 @@ const enTranslations: Translations = {
   'filePanel.emptyTrash': 'Empty trash',
 
   // New file dialog: file types
+  'filePanel.fileName': 'File name',
   'filePanel.fileType': 'File type',
   'filePanel.fileType.drawnix': 'Board',
   'filePanel.fileType.md': 'Markdown',
