@@ -210,13 +210,26 @@
     }
   }
 
-  &__cell-text {
+  // 展示态文字与编辑态镜像共用同一套排版规则，
+  // 保证同一内容（同列宽/字号/行高/内边距）下两态高度完全一致
+  &__cell-text,
+  &__cell-mirror {
     display: block;
     padding: 6px 8px;
     // 字号/颜色/对齐/加粗等均从单元格继承，保证样式设置正确生效
     line-height: 1.5;
+    // 与编辑框同样的换行规则，避免两态换行行数不同导致高度不一致
     word-break: break-word;
     white-space: pre-wrap;
+  }
+
+  &__cell-mirror {
+    // 编辑框绝对定位脱离文档流，没有这个流内占位元素时，
+    // 内容撑高的单元格会在进入编辑瞬间塌回声明行高（高度不一致 + 出现滚动条）
+    visibility: hidden;
+    // 仅作布局占位，不接收任何交互
+    pointer-events: none;
+    user-select: none;
   }
 
   &__cell-editor {
@@ -237,10 +250,23 @@
     font-size: inherit;
     line-height: 1.5;
     text-align: inherit;
+    // 换行规则与展示态一致，输入过程中按同样的行数撑高
+    word-break: break-word;
+    white-space: pre-wrap;
     background: var(--island-bg-color, #fff);
     color: inherit;
     outline: 2px solid var(--color-primary, #4a90e2);
     outline-offset: -2px;
+
+    // 高度由镜像按实际内容撑出，正常不会溢出；
+    // 隐藏滚动条既满足“编辑态不显示滚动条”，也避免滚动条占宽
+    // 压缩文字排版宽度而与展示态换行不一致
+    overflow: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
 
     &:hover,
     &:focus {

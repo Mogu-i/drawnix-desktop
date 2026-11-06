@@ -171,6 +171,13 @@ const hasMergeInRect = (data: TableFileData, rect: SelectionRect) => {
   return false;
 };
 
+/**
+ * 编辑态镜像占位文本：与展示态同样以不换行空格兜底空内容，
+ * 并给末尾换行补一个不可见字符，保证该换行产生的空行也计入高度
+ */
+const buildMirrorText = (draft: string) =>
+  draft.endsWith('\n') ? `${draft}\u00A0` : draft || '\u00A0';
+
 // 表格文档编辑器：支持插入/删除行列、合并单元格、边框、
 // 字号、文字颜色与单元格背景色，修改防抖后自动保存回对应文件
 export const TableEditor = ({ path }: { path: string }) => {
@@ -180,6 +187,9 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 选区：anchor 为起点，focus 为终点；拖动/Shift+点击扩展为矩形
   const [sel, setSel] = useState<{ anchor: CellPos; focus: CellPos } | null>(null);
   const [editing, setEditing] = useState<CellPos | null>(null);
+  // 编辑框受控内容：驱动流内镜像占位元素，使单元格在编辑期间
+  // 始终保持当前文字换行后的实际高度（与保存后的展示态一致）
+  const [draft, setDraft] = useState('');
   const mouseDownRef = useRef(false);
   const dataRef = useRef<TableFileData | null>(null);
   // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
@@ -490,6 +500,12 @@ export const TableEditor = ({ path }: { path: string }) => {
     setSel({ anchor: { row, col }, focus: { row, col } });
   };
 
+  // 进入编辑态：把单元格现有内容同步为草稿，镜像才能立刻撑出真实高度
+  const startEditing = (pos: CellPos, text: string) => {
+    setDraft(text);
+    setEditing(pos);
+  };
+
   // ----- 键盘导航 -----
 
   // 键盘事件由可聚焦的表格容器接收：单击单元格时主动聚焦，
@@ -536,10 +552,12 @@ export const TableEditor = ({ path }: { path: string }) => {
       return;
     }
     switch (event.key) {
-      case 'Enter':
+      case 'Enter': {
         event.preventDefault();
-        setEditing(sel.anchor);
+        const cell = data.cells[sel.anchor.row]?.[sel.anchor.col];
+        startEditing(sel.anchor, cell?.text ?? '');
         return;
+      }
       case 'Tab':
         event.preventDefault();
         moveSelectionByTab(event.shiftKey);
@@ -595,7 +613,8 @@ export const TableEditor = ({ path }: { path: string }) => {
     // 起始尺寸取 DOM 实测值：内容撑高的行渲染高度大于声明值时，
     // 从声明值起拖会让手柄瞬间跳离鼠标位置
     const sameShape =
-      measured && measured.rows.length === sizes.rowHeights.length &&
+      measured &&
+      measured.rows.length === sizes.rowHeights.length &&
       measured.cols.length === sizes.colWidths.length;
     const startSizes =
       type === 'col'
@@ -728,7 +747,8 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 手柄定位优先用 DOM 实测边界（行数/列数与当前数据一致时），声明尺寸累加值仅作首帧兜底，
   // 否则内容把行撑高后手柄仍停留在声明高度处，与表格边框错位
   const sameShape =
-    !!measured && measured.rows.length === rowHeights.length &&
+    !!measured &&
+    measured.rows.length === rowHeights.length &&
     measured.cols.length === colWidths.length;
   const rowBounds = sameShape ? measured.rows : rowOffsets.slice(1);
   const colBounds = sameShape ? measured.cols : colOffsets.slice(1);
@@ -931,6 +951,7 @@ export const TableEditor = ({ path }: { path: string }) => {
                     }
                     const selected =
                       !!rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
+                    const isEditing = !!editing && editing.row === r && editing.col === c;
                     return (
                       <td
                         key={c}
@@ -942,47 +963,56 @@ export const TableEditor = ({ path }: { path: string }) => {
                         })}
                         onMouseDown={(event) => handleCellMouseDown(r, c, event)}
                         onMouseEnter={() => handleCellMouseEnter(r, c)}
-                        onDoubleClick={() => setEditing({ row: r, col: c })}
+                        onDoubleClick={() => startEditing({ row: r, col: c }, cell.text)}
                       >
-                        {editing && editing.row === r && editing.col === c ? (
-                          <textarea
-                            className="table-editor__cell-editor"
-                            defaultValue={cell.text}
-                            style={buildTableTextEffectStyle(cell)}
-                            autoFocus
-                            // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
-                            onMouseDown={(event) => event.stopPropagation()}
-                            // 进入编辑时光标定位到内容末尾，方便直接续写
-                            onFocus={(event) => {
-                              const editor = event.currentTarget;
-                              editor.setSelectionRange(editor.value.length, editor.value.length);
-                            }}
-                            onBlur={(event) => {
-                              setCellText(r, c, event.target.value);
-                              setEditing(null);
-                            }}
-                            onKeyDown={(event) => {
-                              // 回车提交并退出编辑（Shift+回车换行）；
-                              // Escape 同样走 blur 提交，避免误按丢失输入
-                              if (
-                                (event.key === 'Enter' && !event.shiftKey) ||
-                                event.key === 'Escape'
-                              ) {
-                                event.preventDefault();
-                                (event.target as HTMLTextAreaElement).blur();
-                                focusTableWrap();
-                                return;
-                              }
-                              // Tab 提交并横向切换单元格（Shift+Tab 反向）
-                              if (event.key === 'Tab') {
-                                event.preventDefault();
-                                setCellText(r, c, event.currentTarget.value);
+                        {isEditing ? (
+                          <>
+                            {/* 流内镜像：排版规则与展示态一致，撑出当前草稿换行后的真实高度，
+                                使绝对定位的编辑框高度前后一致且不再出现滚动条 */}
+                            <span aria-hidden className="table-editor__cell-mirror">
+                              {buildMirrorText(draft)}
+                            </span>
+                            <textarea
+                              className="table-editor__cell-editor"
+                              value={draft}
+                              style={buildTableTextEffectStyle(cell)}
+                              autoFocus
+                              // 输入实时同步草稿，镜像随内容增高的行数继续撑高单元格
+                              onChange={(event) => setDraft(event.target.value)}
+                              // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
+                              onMouseDown={(event) => event.stopPropagation()}
+                              // 进入编辑时光标定位到内容末尾，方便直接续写
+                              onFocus={(event) => {
+                                const editor = event.currentTarget;
+                                editor.setSelectionRange(editor.value.length, editor.value.length);
+                              }}
+                              onBlur={(event) => {
+                                setCellText(r, c, event.target.value);
                                 setEditing(null);
-                                moveSelectionByTab(event.shiftKey);
-                                focusTableWrap();
-                              }
-                            }}
-                          />
+                              }}
+                              onKeyDown={(event) => {
+                                // 回车提交并退出编辑（Shift+回车换行）；
+                                // Escape 同样走 blur 提交，避免误按丢失输入
+                                if (
+                                  (event.key === 'Enter' && !event.shiftKey) ||
+                                  event.key === 'Escape'
+                                ) {
+                                  event.preventDefault();
+                                  (event.target as HTMLTextAreaElement).blur();
+                                  focusTableWrap();
+                                  return;
+                                }
+                                // Tab 提交并横向切换单元格（Shift+Tab 反向）
+                                if (event.key === 'Tab') {
+                                  event.preventDefault();
+                                  setCellText(r, c, event.currentTarget.value);
+                                  setEditing(null);
+                                  moveSelectionByTab(event.shiftKey);
+                                  focusTableWrap();
+                                }
+                              }}
+                            />
+                          </>
                         ) : (
                           <span className="table-editor__cell-text">{cell.text || '\u00A0'}</span>
                         )}
