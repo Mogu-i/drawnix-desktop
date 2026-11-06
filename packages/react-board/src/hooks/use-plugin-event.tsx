@@ -106,7 +106,15 @@ const useBoardPluginEvent = (
   });
 
   useEventListener('keyup', (event) => {
-    if (PlaitBoard.isFocus(board) && !PlaitBoard.hasBeenTextEditing(board)) {
+    // keyUp 必须无条件回灌给 board.keyUp，不能像 keyDown 那样受 isFocus 限制：
+    // 空格拖拽平移由 withHandPointer.keyDown 进入临时 hand 模式，
+    // 而只有对应的 keyUp 会复位 isShortcutKeyPressed 并清理 BOARD_TO_TEMPORARY_POINTER。
+    // 拖拽过程中画布 selection 可能被清空（例如在画板外松开鼠标触发 globalPointerUp
+    // 清除选区），此时 isFocus 为 false，若沿用 keyDown 的门控，松开的空格 keyUp 将无法
+    // 送达，临时 hand 模式永远残留，导致之后每一次左键 pointerUp 被 withHandPointer 吞掉，
+    // 表现为“松开空格后左键点击画板工具/元素无响应”。
+    // 仅保留对画板内 slate 文本编辑的保护，避免干扰编辑区内空格的正常输入。
+    if (!PlaitBoard.hasBeenTextEditing(board)) {
       board?.keyUp(event);
     }
   });

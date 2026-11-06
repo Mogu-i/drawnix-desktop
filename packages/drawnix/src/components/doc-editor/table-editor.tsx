@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import {
   TableFileData,
@@ -171,6 +171,13 @@ const hasMergeInRect = (data: TableFileData, rect: SelectionRect) => {
   return false;
 };
 
+/**
+ * 编辑态镜像占位文本：与展示态同样以不换行空格兜底空内容，
+ * 并给末尾换行补一个不可见字符，保证该换行产生的空行也计入高度
+ */
+const buildMirrorText = (draft: string) =>
+  draft.endsWith('\n') ? `${draft}\u00A0` : draft || '\u00A0';
+
 // 表格文档编辑器：支持插入/删除行列、合并单元格、边框、
 // 字号、文字颜色与单元格背景色，修改防抖后自动保存回对应文件
 export const TableEditor = ({ path }: { path: string }) => {
@@ -180,6 +187,9 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 选区：anchor 为起点，focus 为终点；拖动/Shift+点击扩展为矩形
   const [sel, setSel] = useState<{ anchor: CellPos; focus: CellPos } | null>(null);
   const [editing, setEditing] = useState<CellPos | null>(null);
+  // 编辑框受控内容：驱动流内镜像占位元素，使单元格在编辑期间
+  // 始终保持当前文字换行后的实际高度（与保存后的展示态一致）
+  const [draft, setDraft] = useState('');
   const mouseDownRef = useRef(false);
   const dataRef = useRef<TableFileData | null>(null);
   // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
@@ -197,6 +207,10 @@ export const TableEditor = ({ path }: { path: string }) => {
   } | null>(null);
   // 表格容器：接收键盘导航事件（tabIndex 聚焦）
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  // 拖拽手柄定位基准：行/列声明尺寸只是最小值，内容（换行/字号/padding）
+  // 撑高时浏览器会把行实际渲染得更高，手柄必须按 DOM 实测边界定位才会与边框对齐
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [measured, setMeasured] = useState<{ rows: number[]; cols: number[] } | null>(null);
 
   const serialize = useCallback(
     () => (dataRef.current ? JSON.stringify(dataRef.current, null, 2) : null),
@@ -281,18 +295,27 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!data || data.rows <= 1) {
       return;
     }
-    const refRow = rect ? rect.r1 : data.rows - 1;
+    // 多选时删除选区覆盖的全部行（rect.r1 ~ rect.r2）；单选/未选时保持原有单行删除行为
+    const startRow = rect ? rect.r1 : data.rows - 1;
+    // 至少保留一行：越界时将删除范围收缩为 data.rows - 1 行
+    const endRow = Math.min(rect ? rect.r2 : data.rows - 1, startRow + (data.rows - 1) - 1);
+    const deleteCount = endRow - startRow + 1;
+    if (deleteCount <= 0) {
+      return;
+    }
     const next: TableFileData = structuredClone(data);
-    // 先解散与该行相交的合并区域，避免跨行合并错位
-    for (let c = 0; c < next.cols; c++) {
-      const master = findMasterCell(next, refRow, c);
-      if (master) {
-        unmergeRegion(next, master.row, master.col);
+    // 先解散与被删行相交的合并区域（含跨入被删区的合并），避免跨行合并错位
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = 0; c < next.cols; c++) {
+        const master = findMasterCell(next, r, c);
+        if (master) {
+          unmergeRegion(next, master.row, master.col);
+        }
       }
     }
-    next.cells.splice(refRow, 1);
-    next.rowHeights?.splice(refRow, 1);
-    next.rows -= 1;
+    next.cells.splice(startRow, deleteCount);
+    next.rowHeights?.splice(startRow, deleteCount);
+    next.rows -= deleteCount;
     setSel(null);
     setEditing(null);
     commit(next);
@@ -322,19 +345,29 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!data || data.cols <= 1) {
       return;
     }
-    const refCol = rect ? rect.c1 : data.cols - 1;
+    // 多选时删除选区覆盖的全部列（rect.c1 ~ rect.c2）；单选/未选时保持原有单列删除行为
+    const startCol = rect ? rect.c1 : data.cols - 1;
+    // 至少保留一列：越界时将删除范围收缩为 data.cols - 1 列
+    const endCol = Math.min(rect ? rect.c2 : data.cols - 1, startCol + (data.cols - 1) - 1);
+    const deleteCount = endCol - startCol + 1;
+    if (deleteCount <= 0) {
+      return;
+    }
     const next: TableFileData = structuredClone(data);
+    // 先解散与被删列相交的合并区域（含跨入被删区的合并），避免跨列合并错位
     for (let r = 0; r < next.rows; r++) {
-      const master = findMasterCell(next, r, refCol);
-      if (master) {
-        unmergeRegion(next, master.row, master.col);
+      for (let c = startCol; c <= endCol; c++) {
+        const master = findMasterCell(next, r, c);
+        if (master) {
+          unmergeRegion(next, master.row, master.col);
+        }
       }
     }
     next.cells.forEach((row) => {
-      row.splice(refCol, 1);
+      row.splice(startCol, deleteCount);
     });
-    next.colWidths?.splice(refCol, 1);
-    next.cols -= 1;
+    next.colWidths?.splice(startCol, deleteCount);
+    next.cols -= deleteCount;
     setSel(null);
     setEditing(null);
     commit(next);
@@ -467,6 +500,12 @@ export const TableEditor = ({ path }: { path: string }) => {
     setSel({ anchor: { row, col }, focus: { row, col } });
   };
 
+  // 进入编辑态：把单元格现有内容同步为草稿，镜像才能立刻撑出真实高度
+  const startEditing = (pos: CellPos, text: string) => {
+    setDraft(text);
+    setEditing(pos);
+  };
+
   // ----- 键盘导航 -----
 
   // 键盘事件由可聚焦的表格容器接收：单击单元格时主动聚焦，
@@ -513,10 +552,12 @@ export const TableEditor = ({ path }: { path: string }) => {
       return;
     }
     switch (event.key) {
-      case 'Enter':
+      case 'Enter': {
         event.preventDefault();
-        setEditing(sel.anchor);
+        const cell = data.cells[sel.anchor.row]?.[sel.anchor.col];
+        startEditing(sel.anchor, cell?.text ?? '');
         return;
+      }
       case 'Tab':
         event.preventDefault();
         moveSelectionByTab(event.shiftKey);
@@ -569,11 +610,25 @@ export const TableEditor = ({ path }: { path: string }) => {
       colWidths: getTableColWidths(data.colWidths, data.cols),
       rowHeights: getTableRowHeights(data.rowHeights, data.rows),
     };
+    // 起始尺寸取 DOM 实测值：内容撑高的行渲染高度大于声明值时，
+    // 从声明值起拖会让手柄瞬间跳离鼠标位置
+    const sameShape =
+      measured &&
+      measured.rows.length === sizes.rowHeights.length &&
+      measured.cols.length === sizes.colWidths.length;
+    const startSizes =
+      type === 'col'
+        ? sameShape
+          ? measured!.cols.map((b, i) => b - (i > 0 ? measured!.cols[i - 1] : 0))
+          : sizes.colWidths
+        : sameShape
+          ? measured!.rows.map((b, i) => b - (i > 0 ? measured!.rows[i - 1] : 0))
+          : sizes.rowHeights;
     resizeRef.current = {
       type,
       index,
       startPos: type === 'col' ? event.clientX : event.clientY,
-      startSize: type === 'col' ? sizes.colWidths[index] : sizes.rowHeights[index],
+      startSize: startSizes[index],
     };
     previewRef.current = sizes;
     setResizing(true);
@@ -626,6 +681,54 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [resizing, commit]);
 
+  // 从 DOM 实测各行下边界/各列右边界（相对表格左上角）；
+  // 与上次结果一致时保持原引用，避免 ResizeObserver 回调 setState 引发自激循环
+  const measureBoundaries = useCallback(() => {
+    const table = tableRef.current;
+    if (!table) {
+      return;
+    }
+    const base = table.getBoundingClientRect();
+    const rows: number[] = [];
+    table.querySelectorAll('tbody > tr').forEach((tr) => {
+      rows.push(tr.getBoundingClientRect().bottom - base.top);
+    });
+    const cols: number[] = [];
+    table.querySelectorAll('colgroup > col').forEach((col) => {
+      cols.push(col.getBoundingClientRect().right - base.left);
+    });
+    setMeasured((prev) => {
+      if (
+        prev &&
+        prev.rows.length === rows.length &&
+        prev.cols.length === cols.length &&
+        prev.rows.every((v, i) => Math.abs(v - rows[i]) < 0.5) &&
+        prev.cols.every((v, i) => Math.abs(v - cols[i]) < 0.5)
+      ) {
+        return prev;
+      }
+      return { rows, cols };
+    });
+  }, []);
+
+  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐
+  useLayoutEffect(() => {
+    measureBoundaries();
+  }, [data, resizePreview, measureBoundaries]);
+
+  // 字体加载、窗口缩放等异步回流导致的行高变化由 ResizeObserver 兜底重新测量
+  useEffect(() => {
+    const table = tableRef.current;
+    if (!table || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(() => measureBoundaries());
+    observer.observe(table);
+    return () => {
+      observer.disconnect();
+    };
+  }, [data, measureBoundaries]);
+
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
   }
@@ -637,12 +740,20 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 拖拽调整过程中使用预览尺寸，否则使用已保存的尺寸
   const colWidths = resizePreview?.colWidths ?? getTableColWidths(data.colWidths, data.cols);
   const rowHeights = resizePreview?.rowHeights ?? getTableRowHeights(data.rowHeights, data.rows);
-  const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
-  const tableHeight = rowHeights.reduce((sum, height) => sum + height, 0);
   const colOffsets = [0];
   colWidths.forEach((width) => colOffsets.push(colOffsets[colOffsets.length - 1] + width));
   const rowOffsets = [0];
   rowHeights.forEach((height) => rowOffsets.push(rowOffsets[rowOffsets.length - 1] + height));
+  // 手柄定位优先用 DOM 实测边界（行数/列数与当前数据一致时），声明尺寸累加值仅作首帧兜底，
+  // 否则内容把行撑高后手柄仍停留在声明高度处，与表格边框错位
+  const sameShape =
+    !!measured &&
+    measured.rows.length === rowHeights.length &&
+    measured.cols.length === colWidths.length;
+  const rowBounds = sameShape ? measured.rows : rowOffsets.slice(1);
+  const colBounds = sameShape ? measured.cols : colOffsets.slice(1);
+  const tableWidth = colBounds[colBounds.length - 1] ?? colOffsets[colOffsets.length - 1];
+  const tableHeight = rowBounds[rowBounds.length - 1] ?? rowOffsets[rowOffsets.length - 1];
 
   // 当前选区首个单元格的样式，用于工具栏按钮高亮
   const firstCell = data.cells[rect?.r1 ?? 0]?.[rect?.c1 ?? 0];
@@ -825,7 +936,7 @@ export const TableEditor = ({ path }: { path: string }) => {
               : undefined
           }
         >
-          <table className="table-editor__table" cellPadding={0}>
+          <table ref={tableRef} className="table-editor__table" cellPadding={0}>
             <colgroup>
               {colWidths.map((width, c) => (
                 <col key={c} style={{ width: `${width}px` }} />
@@ -840,6 +951,7 @@ export const TableEditor = ({ path }: { path: string }) => {
                     }
                     const selected =
                       !!rect && r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2;
+                    const isEditing = !!editing && editing.row === r && editing.col === c;
                     return (
                       <td
                         key={c}
@@ -851,47 +963,56 @@ export const TableEditor = ({ path }: { path: string }) => {
                         })}
                         onMouseDown={(event) => handleCellMouseDown(r, c, event)}
                         onMouseEnter={() => handleCellMouseEnter(r, c)}
-                        onDoubleClick={() => setEditing({ row: r, col: c })}
+                        onDoubleClick={() => startEditing({ row: r, col: c }, cell.text)}
                       >
-                        {editing && editing.row === r && editing.col === c ? (
-                          <textarea
-                            className="table-editor__cell-editor"
-                            defaultValue={cell.text}
-                            style={buildTableTextEffectStyle(cell)}
-                            autoFocus
-                            // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
-                            onMouseDown={(event) => event.stopPropagation()}
-                            // 进入编辑时光标定位到内容末尾，方便直接续写
-                            onFocus={(event) => {
-                              const editor = event.currentTarget;
-                              editor.setSelectionRange(editor.value.length, editor.value.length);
-                            }}
-                            onBlur={(event) => {
-                              setCellText(r, c, event.target.value);
-                              setEditing(null);
-                            }}
-                            onKeyDown={(event) => {
-                              // 回车提交并退出编辑（Shift+回车换行）；
-                              // Escape 同样走 blur 提交，避免误按丢失输入
-                              if (
-                                (event.key === 'Enter' && !event.shiftKey) ||
-                                event.key === 'Escape'
-                              ) {
-                                event.preventDefault();
-                                (event.target as HTMLTextAreaElement).blur();
-                                focusTableWrap();
-                                return;
-                              }
-                              // Tab 提交并横向切换单元格（Shift+Tab 反向）
-                              if (event.key === 'Tab') {
-                                event.preventDefault();
-                                setCellText(r, c, event.currentTarget.value);
+                        {isEditing ? (
+                          <>
+                            {/* 流内镜像：排版规则与展示态一致，撑出当前草稿换行后的真实高度，
+                                使绝对定位的编辑框高度前后一致且不再出现滚动条 */}
+                            <span aria-hidden className="table-editor__cell-mirror">
+                              {buildMirrorText(draft)}
+                            </span>
+                            <textarea
+                              className="table-editor__cell-editor"
+                              value={draft}
+                              style={buildTableTextEffectStyle(cell)}
+                              autoFocus
+                              // 输入实时同步草稿，镜像随内容增高的行数继续撑高单元格
+                              onChange={(event) => setDraft(event.target.value)}
+                              // 阻止冒泡，避免点击文本框重置选区/重新触发进入编辑
+                              onMouseDown={(event) => event.stopPropagation()}
+                              // 进入编辑时光标定位到内容末尾，方便直接续写
+                              onFocus={(event) => {
+                                const editor = event.currentTarget;
+                                editor.setSelectionRange(editor.value.length, editor.value.length);
+                              }}
+                              onBlur={(event) => {
+                                setCellText(r, c, event.target.value);
                                 setEditing(null);
-                                moveSelectionByTab(event.shiftKey);
-                                focusTableWrap();
-                              }
-                            }}
-                          />
+                              }}
+                              onKeyDown={(event) => {
+                                // 回车提交并退出编辑（Shift+回车换行）；
+                                // Escape 同样走 blur 提交，避免误按丢失输入
+                                if (
+                                  (event.key === 'Enter' && !event.shiftKey) ||
+                                  event.key === 'Escape'
+                                ) {
+                                  event.preventDefault();
+                                  (event.target as HTMLTextAreaElement).blur();
+                                  focusTableWrap();
+                                  return;
+                                }
+                                // Tab 提交并横向切换单元格（Shift+Tab 反向）
+                                if (event.key === 'Tab') {
+                                  event.preventDefault();
+                                  setCellText(r, c, event.currentTarget.value);
+                                  setEditing(null);
+                                  moveSelectionByTab(event.shiftKey);
+                                  focusTableWrap();
+                                }
+                              }}
+                            />
+                          </>
                         ) : (
                           <span className="table-editor__cell-text">{cell.text || '\u00A0'}</span>
                         )}
@@ -907,7 +1028,7 @@ export const TableEditor = ({ path }: { path: string }) => {
             <div
               key={`col-${c}`}
               className="table-editor__resize-handle table-editor__resize-handle--col"
-              style={{ left: colOffsets[c + 1] - 4, height: tableHeight }}
+              style={{ left: colBounds[c] - 4, height: tableHeight }}
               onMouseDown={(event) => startResize('col', c, event)}
             />
           ))}
@@ -916,7 +1037,7 @@ export const TableEditor = ({ path }: { path: string }) => {
             <div
               key={`row-${r}`}
               className="table-editor__resize-handle table-editor__resize-handle--row"
-              style={{ top: rowOffsets[r + 1] - 4, width: tableWidth }}
+              style={{ top: rowBounds[r] - 4, width: tableWidth }}
               onMouseDown={(event) => startResize('row', r, event)}
             />
           ))}

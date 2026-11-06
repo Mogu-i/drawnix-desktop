@@ -162,6 +162,7 @@ export interface Translations {
   'filePanel.emptyTrash': string;
 
   // New file dialog: file types
+  'filePanel.fileName': string;
   'filePanel.fileType': string;
   'filePanel.fileType.drawnix': string;
   'filePanel.fileType.md': string;

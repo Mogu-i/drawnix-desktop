@@ -2,21 +2,21 @@
   background: var(--island-bg-color, #fff);
   color: var(--color-on-surface, #1a1a1a);
   border-radius: 8px;
-  padding: 20px;
-  width: 320px;
+  padding: 24px;
+  width: 360px;
   max-width: calc(100vw - 30px);
 
   &__title {
     font-size: 18px;
     font-weight: 500;
-    margin: 0 0 12px;
+    margin: 0 0 20px;
   }
 
   &__input {
     width: 100%;
     box-sizing: border-box;
     font-size: 14px;
-    padding: 8px 10px;
+    padding: 9px 12px;
     border: 1px solid var(--island-border-color, #e0e0e0);
     border-radius: var(--border-radius-sm, 4px);
     background-color: var(--island-bg-color, #fff);
@@ -29,14 +29,18 @@
   }
 
   &__group {
-    margin-top: 12px;
+    margin-top: 16px;
+
+    &--table-size {
+      margin-top: 12px;
+    }
   }
 
   &__group-label {
     font-size: 13px;
     font-weight: 500;
     color: var(--color-on-surface-muted, #666);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
 
   &__select {
@@ -46,7 +50,6 @@
   &__table-size {
     display: flex;
     gap: 12px;
-    margin-top: 12px;
   }
 
   &__table-size-item {
@@ -84,7 +87,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 24px;
   }
 
   &__button {

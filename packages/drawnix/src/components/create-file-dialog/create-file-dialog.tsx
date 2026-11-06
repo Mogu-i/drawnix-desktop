@@ -95,73 +95,6 @@ export const CreateFileDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="create-file-dialog" container={container}>
         <h2 className="create-file-dialog__title">{t('filePanel.newFile')}</h2>
-        <div className="create-file-dialog__group">
-          <div className="create-file-dialog__group-label">
-            {t('filePanel.fileType')}
-          </div>
-          <Select.Root
-            value={fileType}
-            onValueChange={(value) => {
-              setFileType(value as TauriFileType);
-            }}
-          >
-            <Select.Trigger
-              className="create-file-dialog__select"
-              aria-label={t('filePanel.fileType')}
-            >
-              {t(`filePanel.fileType.${fileType}`)}
-            </Select.Trigger>
-            <Select.Content container={container}>
-              {FILE_TYPE_OPTIONS.map((type) => (
-                <Select.Item key={type} value={type}>
-                  {t(`filePanel.fileType.${type}`)}
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Root>
-        </div>
-        <input
-          className="create-file-dialog__input"
-          type="text"
-          placeholder={t('filePanel.newFilePlaceholder')}
-          value={fileName}
-          autoFocus
-          onFocus={(event) => event.target.select()}
-          onChange={(event) => setFileName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              handleCreate();
-            }
-          }}
-        />
-        {fileType === 'table' && (
-          <div className="create-file-dialog__table-size">
-            <label className="create-file-dialog__table-size-item">
-              <span>{t('filePanel.tableRows')}</span>
-              <input
-                type="number"
-                min={MIN_TABLE_SIZE}
-                max={MAX_TABLE_SIZE}
-                value={tableRows}
-                onChange={(event) =>
-                  setTableRows(clampTableSize(Number(event.target.value), DEFAULT_TABLE_ROWS))
-                }
-              />
-            </label>
-            <label className="create-file-dialog__table-size-item">
-              <span>{t('filePanel.tableCols')}</span>
-              <input
-                type="number"
-                min={MIN_TABLE_SIZE}
-                max={MAX_TABLE_SIZE}
-                value={tableCols}
-                onChange={(event) =>
-                  setTableCols(clampTableSize(Number(event.target.value), DEFAULT_TABLE_COLS))
-                }
-              />
-            </label>
-          </div>
-        )}
         {dirs.length > 0 && (
           <div className="create-file-dialog__group">
             <div className="create-file-dialog__group-label">
@@ -191,6 +124,78 @@ export const CreateFileDialog = ({
                 ))}
               </Select.Content>
             </Select.Root>
+          </div>
+        )}
+        <div className="create-file-dialog__group">
+          <div className="create-file-dialog__group-label">
+            {t('filePanel.fileType')}
+          </div>
+          <Select.Root
+            value={fileType}
+            onValueChange={(value) => {
+              setFileType(value as TauriFileType);
+            }}
+          >
+            <Select.Trigger
+              className="create-file-dialog__select"
+              aria-label={t('filePanel.fileType')}
+            >
+              {t(`filePanel.fileType.${fileType}`)}
+            </Select.Trigger>
+            <Select.Content container={container}>
+              {FILE_TYPE_OPTIONS.map((type) => (
+                <Select.Item key={type} value={type}>
+                  {t(`filePanel.fileType.${type}`)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </div>
+        <div className="create-file-dialog__group">
+          <div className="create-file-dialog__group-label">{t('filePanel.fileName')}</div>
+          <input
+            className="create-file-dialog__input"
+            type="text"
+            placeholder={t('filePanel.newFilePlaceholder')}
+            value={fileName}
+            autoFocus
+            onFocus={(event) => event.target.select()}
+            onChange={(event) => setFileName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                handleCreate();
+              }
+            }}
+          />
+        </div>
+        {fileType === 'table' && (
+          <div className="create-file-dialog__group create-file-dialog__group--table-size">
+            <div className="create-file-dialog__table-size">
+              <label className="create-file-dialog__table-size-item">
+                <span>{t('filePanel.tableRows')}</span>
+                <input
+                  type="number"
+                  min={MIN_TABLE_SIZE}
+                  max={MAX_TABLE_SIZE}
+                  value={tableRows}
+                  onChange={(event) =>
+                    setTableRows(clampTableSize(Number(event.target.value), DEFAULT_TABLE_ROWS))
+                  }
+                />
+              </label>
+              <label className="create-file-dialog__table-size-item">
+                <span>{t('filePanel.tableCols')}</span>
+                <input
+                  type="number"
+                  min={MIN_TABLE_SIZE}
+                  max={MAX_TABLE_SIZE}
+                  value={tableCols}
+                  onChange={(event) =>
+                    setTableCols(clampTableSize(Number(event.target.value), DEFAULT_TABLE_COLS))
+                  }
+                />
+              </label>
+            </div>
           </div>
         )}
         <div className="create-file-dialog__actions">
