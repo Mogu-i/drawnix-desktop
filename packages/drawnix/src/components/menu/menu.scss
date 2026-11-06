@@ -23,6 +23,9 @@
 
     .menu-container {
       background-color: var(--island-bg-color);
+      border: 1px solid var(--dx-border-hairline);
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--dx-shadow-popover);
       min-width: 160px;
       max-height: calc(100vh - 150px);
       overflow-y: auto;
@@ -147,7 +150,7 @@
       }
 
       &:hover {
-        background-color: var(--color-surface-primary-container);
+        background-color: var(--color-surface-high);
         text-decoration: none;
       }
 

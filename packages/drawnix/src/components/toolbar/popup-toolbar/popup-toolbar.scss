@@ -5,11 +5,12 @@
         align-items: center;
         gap: 2px;
         padding: 0 4px 0 4px;
-        border-radius: var(--border-radius-sm);
+        border-radius: var(--border-radius-md);
         background-color: var(--color-surface-secondary-container);
         color: var(--color-on-surface);
+        font-variant-numeric: tabular-nums;
         &:not([data-disable-hover]):hover {
-            background-color: var(--color-surface-primary-container);
+            background-color: var(--color-surface-high);
         }
         .popup-font-size__input {
             width: 36px;

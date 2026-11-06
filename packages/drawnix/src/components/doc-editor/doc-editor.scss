@@ -6,33 +6,37 @@
   z-index: 100;
   display: flex;
   flex-direction: column;
-  background: var(--island-bg-color, #fff);
-  color: var(--color-on-surface, #1a1a1a);
+  background: var(--island-bg-color);
+  color: var(--color-on-surface);
 
   &__header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--island-border-color, #e0e0e0);
+    gap: 10px;
+    height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--dx-border-hairline);
     flex: 0 0 auto;
   }
 
   &__badge {
-    font-size: 12px;
+    font-size: var(--dx-font-xs);
     line-height: 1;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: var(--color-surface-secondary-container, #f0f0f0);
-    color: var(--color-on-surface-muted, #666);
+    letter-spacing: 0.2px;
+    padding: 5px 9px;
+    border-radius: var(--dx-radius-full);
+    background: var(--color-surface-secondary-container);
+    color: var(--color-on-surface-muted);
+    font-weight: 500;
     white-space: nowrap;
   }
 
   &__filename {
     flex: 1;
     min-width: 0;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--dx-font-base);
+    font-weight: 600;
+    color: var(--color-on-surface);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -40,20 +44,28 @@
 
   &__close {
     flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    border: 1px solid var(--island-border-color, #e0e0e0);
-    border-radius: var(--border-radius-sm, 4px);
+    font-size: var(--dx-font-sm);
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-md);
     background: transparent;
-    color: var(--color-on-surface, #1a1a1a);
+    color: var(--color-on-surface-muted);
     cursor: pointer;
+    transition: background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease);
 
     &:hover {
-      background: var(--color-surface-primary-container, #ececec);
+      background: var(--color-surface-high);
+      color: var(--color-on-surface);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
     }
   }
 
@@ -62,7 +74,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    color: var(--color-on-surface-muted, #888);
+    font-size: var(--dx-font-base);
+    color: var(--color-on-surface-muted);
   }
 }

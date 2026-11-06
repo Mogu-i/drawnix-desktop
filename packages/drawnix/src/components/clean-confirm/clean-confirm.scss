@@ -1,18 +1,22 @@
 .clean-confirm {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  width: 300px;
+  background: var(--island-bg-color);
+  border: 1px solid var(--dx-border-hairline);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--dx-shadow-dialog);
+  padding: 24px;
+  width: 320px;
 
   &__title {
-    font-size: 18px;
-    font-weight: 500;
+    font-size: var(--dx-font-lg);
+    font-weight: 600;
+    color: var(--color-on-surface);
     margin: 0 0 8px;
   }
 
   &__description {
-    color: #666;
-    font-size: 14px;
+    color: var(--color-on-surface-muted);
+    font-size: var(--dx-font-base);
+    line-height: 1.6;
     margin: 0 0 20px;
   }
 
@@ -23,29 +27,38 @@
   }
 
   &__button {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 14px;
+    height: var(--control-height);
+    padding: 0 16px;
+    border-radius: var(--border-radius-md);
+    font-size: var(--dx-font-base);
     cursor: pointer;
-    border: none;
+    border: 1px solid transparent;
+    transition: background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease),
+      border-color var(--dx-duration-fast) var(--dx-ease);
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--focus-highlight-color);
+    }
 
     &--cancel {
-      background: #f5f5f5;
-      color: #000;
-      
+      background: var(--color-surface-secondary-container);
+      color: var(--color-on-surface);
+
       &:hover {
-        background: #e8e8e8;
+        background: var(--color-surface-high);
       }
     }
 
     &--ok {
-      background: white;
-      color: #ff4d4f;
-      border: 1px solid #ff4d4f;
-      
+      background: transparent;
+      color: var(--color-error);
+      border: 1px solid var(--color-error);
+
       &:hover {
-        color: white;
-        background: #ff4d4f;
+        color: var(--color-on-primary);
+        background: var(--color-error);
       }
     }
   }
