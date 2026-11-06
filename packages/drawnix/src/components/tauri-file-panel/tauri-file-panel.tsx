@@ -947,9 +947,7 @@ export const TauriFilePanel = () => {
         }
       >
         <span className="tauri-file-panel__item-name">{lastSeg(path)}</span>
-        {ext !== 'drawnix' && (
-          <span className="tauri-file-panel__item-ext">{ext.toUpperCase()}</span>
-        )}
+        <span className="tauri-file-panel__item-ext">{ext.toUpperCase()}</span>
       </button>
     );
   };
@@ -1115,9 +1113,7 @@ export const TauriFilePanel = () => {
               }
             >
               <span className="tauri-file-panel__item-name">{lastSeg(file.path)}</span>
-              {file.ext !== 'drawnix' && (
-                <span className="tauri-file-panel__item-ext">{file.ext.toUpperCase()}</span>
-              )}
+              <span className="tauri-file-panel__item-ext">{file.ext.toUpperCase()}</span>
             </button>
           ))}
       </div>

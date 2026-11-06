@@ -285,18 +285,27 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!data || data.rows <= 1) {
       return;
     }
-    const refRow = rect ? rect.r1 : data.rows - 1;
+    // 多选时删除选区覆盖的全部行（rect.r1 ~ rect.r2）；单选/未选时保持原有单行删除行为
+    const startRow = rect ? rect.r1 : data.rows - 1;
+    // 至少保留一行：越界时将删除范围收缩为 data.rows - 1 行
+    const endRow = Math.min(rect ? rect.r2 : data.rows - 1, startRow + (data.rows - 1) - 1);
+    const deleteCount = endRow - startRow + 1;
+    if (deleteCount <= 0) {
+      return;
+    }
     const next: TableFileData = structuredClone(data);
-    // 先解散与该行相交的合并区域，避免跨行合并错位
-    for (let c = 0; c < next.cols; c++) {
-      const master = findMasterCell(next, refRow, c);
-      if (master) {
-        unmergeRegion(next, master.row, master.col);
+    // 先解散与被删行相交的合并区域（含跨入被删区的合并），避免跨行合并错位
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = 0; c < next.cols; c++) {
+        const master = findMasterCell(next, r, c);
+        if (master) {
+          unmergeRegion(next, master.row, master.col);
+        }
       }
     }
-    next.cells.splice(refRow, 1);
-    next.rowHeights?.splice(refRow, 1);
-    next.rows -= 1;
+    next.cells.splice(startRow, deleteCount);
+    next.rowHeights?.splice(startRow, deleteCount);
+    next.rows -= deleteCount;
     setSel(null);
     setEditing(null);
     commit(next);
@@ -326,19 +335,29 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!data || data.cols <= 1) {
       return;
     }
-    const refCol = rect ? rect.c1 : data.cols - 1;
+    // 多选时删除选区覆盖的全部列（rect.c1 ~ rect.c2）；单选/未选时保持原有单列删除行为
+    const startCol = rect ? rect.c1 : data.cols - 1;
+    // 至少保留一列：越界时将删除范围收缩为 data.cols - 1 列
+    const endCol = Math.min(rect ? rect.c2 : data.cols - 1, startCol + (data.cols - 1) - 1);
+    const deleteCount = endCol - startCol + 1;
+    if (deleteCount <= 0) {
+      return;
+    }
     const next: TableFileData = structuredClone(data);
+    // 先解散与被删列相交的合并区域（含跨入被删区的合并），避免跨列合并错位
     for (let r = 0; r < next.rows; r++) {
-      const master = findMasterCell(next, r, refCol);
-      if (master) {
-        unmergeRegion(next, master.row, master.col);
+      for (let c = startCol; c <= endCol; c++) {
+        const master = findMasterCell(next, r, c);
+        if (master) {
+          unmergeRegion(next, master.row, master.col);
+        }
       }
     }
     next.cells.forEach((row) => {
-      row.splice(refCol, 1);
+      row.splice(startCol, deleteCount);
     });
-    next.colWidths?.splice(refCol, 1);
-    next.cols -= 1;
+    next.colWidths?.splice(startCol, deleteCount);
+    next.cols -= deleteCount;
     setSel(null);
     setEditing(null);
     commit(next);
