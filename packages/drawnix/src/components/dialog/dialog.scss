@@ -3,8 +3,8 @@
     backdrop-filter: blur(1.5px);
     display: grid;
     place-items: center;
-    /* 保证弹窗盖在欢迎页（z-index: 500）等覆盖层之上 */
-    z-index: 1000;
+    // 弹窗层级（G4）：盖在欢迎页（50）、窄屏抽屉（62）与右键菜单（65）之上
+    z-index: 70;
 }
 
 .Dialog {

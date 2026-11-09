@@ -34,26 +34,32 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    // 窄屏路径输入换行，不再裁切（E5/G2）
+    flex-wrap: wrap;
   }
 
-  &__data-dir-path {
-    flex: 1;
+  &__data-dir-input {
+    flex: 1 1 200px;
     min-width: 0;
     height: var(--control-height);
-    // 由于需要 ellipsis，不能用 display:flex（会屏蔽 text-overflow），
-    // 改用 line-height 居中（减去上下 1px 边框）
-    line-height: calc(var(--control-height) - 2px);
     font-size: var(--dx-font-xs);
     padding: 0 10px;
     border: 1px solid var(--dx-border-strong);
     border-radius: var(--border-radius-md);
-    background-color: var(--color-surface-secondary-container);
+    background-color: var(--island-bg-color);
     color: var(--color-on-surface);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: rtl;
-    text-align: left;
+    outline: none;
+    transition: border-color var(--dx-duration-fast) var(--dx-ease),
+      box-shadow var(--dx-duration-fast) var(--dx-ease);
+
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--focus-highlight-color);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+    }
   }
 
   &__browse-button {

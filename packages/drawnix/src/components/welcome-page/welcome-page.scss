@@ -4,7 +4,8 @@
   .welcome-page {
     position: absolute;
     inset: 0;
-    z-index: 500;
+    // 空状态覆盖层：盖住画布与工具栏，但低于窄屏抽屉（62）与弹窗（1000）（G4）
+    z-index: 50;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -77,11 +78,5 @@
       }
     }
 
-    &__hint {
-      position: relative;
-      font-size: var(--dx-font-xs);
-      color: var(--dx-text-tertiary);
-      margin: 6px 0 0;
-    }
   }
 }

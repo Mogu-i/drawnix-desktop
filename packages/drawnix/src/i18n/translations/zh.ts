@@ -89,6 +89,7 @@ const zhTranslations: Translations = {
   'toast.tauriFile.exportFailed': '导出失败',
   'toast.tauriFile.deleteFailed': '删除失败',
   'toast.tauriFile.restoreFailed': '恢复失败',
+  'toast.tauriFile.createFolderFailed': '创建文件夹失败，目标文件夹可能已存在',
 
   // Language
   'language.switcher': 'Language',
@@ -148,8 +149,8 @@ const zhTranslations: Translations = {
   'filePanel.newFolder': '新建分组',
   'filePanel.newSubFolder': '新建子分组',
   'filePanel.newFolderPlaceholder': '输入分组名…',
-  'filePanel.folderLocation': '所在分组',
-  'filePanel.defaultLocation': '根目录',
+  'filePanel.folderLocation': '所在文件夹',
+  'filePanel.defaultLocation': '顶层',
   'filePanel.saveAs': '另存为',
   'filePanel.exportImage': '导出图片',
   'filePanel.restore': '恢复',
@@ -224,9 +225,9 @@ const zhTranslations: Translations = {
   'deleteConfirm.ok': '删除',
 
   // Delete folder confirm dialog
-  'folderDeleteConfirm.title': '删除分组',
+  'folderDeleteConfirm.title': '删除文件夹',
   'folderDeleteConfirm.description':
-    '分组内的所有文件将移入回收站，超过保留天数后自动清除。是否继续？',
+    '文件夹将被删除，其中的文件与子文件夹会移到顶层。是否继续？',
 
   // Move entry dialog
   'moveDialog.title': '选择目标分组',
@@ -240,7 +241,7 @@ const zhTranslations: Translations = {
   'settings.title': '设置',
   'settings.language': '语言',
   'settings.dataDir': '数据存储路径',
-  'settings.dataDirBrowse': '浏览…',
+  'settings.dataDirBrowse': '浏览...',
   'settings.dataDirHint':
     '修改路径后，现有文件（白板/Markdown/表格）会自动迁移到新路径（原文件保留作为备份）。',
   'settings.dataDirMigrating': '迁移中…',
@@ -254,11 +255,51 @@ const zhTranslations: Translations = {
   'login.button': '登录',
   'login.notAvailable': '登录功能暂未开放',
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': '思画',
+  'workbench.brand.en': 'DRAWNIX',
+  'workbench.tab.more': '更多操作',
+  'workbench.tab.dirtySuffix': '有未保存的修改',
+  'workbench.tab.closeTab': '收起页签',
+  'workbench.tab.collapsePanel': '收起文件面板',
+  'workbench.tab.windowMenu': '窗口',
+  'workbench.window.group': '窗口',
+  'workbench.window.minimize': '最小化',
+  'workbench.window.maximize': '最大化',
+  'workbench.window.restore': '向下还原',
+  'workbench.window.close': '关闭',
+  'workbench.window.minimizeWindow': '最小化窗口',
+  'workbench.window.maximizeWindow': '最大化窗口',
+  'workbench.window.restoreWindow': '向下还原为窗口',
+  'workbench.window.closeWindow': '关闭窗口',
+  'workbench.window.maximizedToast': '已最大化',
+  'workbench.window.restoredToast': '已还原为窗口',
+  'workbench.window.recoveredToast': '窗口已恢复',
+  'workbench.panel.newBoard': '新建白板',
+  'workbench.panel.newTable': '新建表格',
+  'workbench.panel.newMd': '新建 Markdown',
+  'workbench.panel.newFolder': '新建文件夹',
+  'workbench.panel.newMore': '选择新建类型',
+  'workbench.panel.folderItems': '{count} 项',
+  'workbench.create.nameEmpty': '请输入文件名',
+  'workbench.create.nameDuplicate': '已有同名文件，请换一个名称',
+  'workbench.create.folderLocation': '所在文件夹',
+  'workbench.save.success': '已保存「{name}」到本地文件',
+  'workbench.save.noFile': '请先打开一个文件',
+  'workbench.exit.title': '退出思画',
+  'workbench.exit.dirtyDescription':
+    '以下 {count} 个文件还有未保存的修改。退出后内容仍保留在本机，重新打开可以继续编辑。',
+  'workbench.exit.cleanDescription': '所有文件都已保存，退出后随时可以重新打开继续编辑。',
+  'workbench.exit.cancel': '取消',
+  'workbench.exit.confirm': '退出',
+
   // Welcome page (Tauri desktop)
   'welcome.title': '欢迎使用 Drawnix',
   'welcome.description': '一体化白板：思维导图、流程图、自由画笔，数据保存在本地文件中',
   'welcome.newFile': '新建文件',
   'welcome.sidebarHint': '或从左侧列表打开已有文件',
+  'welcome.emptyTitle': '还没有打开的文件',
+  'welcome.emptyDescription': '新建白板、表格或 Markdown，或从上方文件栏选择一个文件继续编辑。',
 
   // Link popup items
   'popupLink.delLink': '移除连结',

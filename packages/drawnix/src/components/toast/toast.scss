@@ -1,6 +1,7 @@
 .drawnix-toast-wrapper {
     position: absolute;
-    z-index: 2023;
+    // 轻提示层级（G4）：高于弹窗（70）、低于窗口状态卡片（90）
+    z-index: 80;
     bottom: 36px;
     left: 50%;
     max-width: calc(100% - 32px);

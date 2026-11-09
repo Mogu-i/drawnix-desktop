@@ -1,34 +1,25 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
-  clearTauriFileDirty,
   isTauriFileSaveSuppressed,
   markTauriFileDirty,
-  notifyTauriFilesChanged,
   resumeTauriFileSave,
-  writeTauriFile,
+  setTauriDocDraft,
 } from '../../data/tauri-file';
-import { useDrawnix } from '../../hooks/use-drawnix';
-import { useI18n } from '../../i18n';
 
-const SAVE_DELAY_MS = 600;
-
-/** 文档编辑器（Markdown/表格）的防抖保存逻辑，由两种编辑器共用 */
+/**
+ * 文档编辑器（Markdown/表格）的编辑捕获逻辑，由两种编辑器共用：
+ * 编辑时只标脏并写草稿缓存（localStorage），不直接写盘；
+ * 落盘统一由页签栏保存入口（保存按钮 / Ctrl+S / 退出前 flush）触发，
+ * 保存失败时草稿与脏标记保留，输入与光标不受影响
+ */
 export const useDocAutoSave = (
   path: string,
-  fileType: 'md' | 'table',
   serialize: () => string | null
 ) => {
-  const { showToast } = useDrawnix();
-  const { t } = useI18n();
-  // 内容是否已成功加载；未加载前禁止保存，避免用空内容覆盖原文件
+  // 内容是否已成功加载；未加载前禁止写草稿，避免用空内容覆盖
   const loadedRef = useRef(false);
-  const timerRef = useRef<number | null>(null);
 
-  const flushSave = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
+  const flushDraft = useCallback(() => {
     if (!loadedRef.current) {
       return;
     }
@@ -37,28 +28,19 @@ export const useDocAutoSave = (
       return;
     }
     const content = serialize();
-    if (content === null) {
-      return;
+    if (content !== null) {
+      setTauriDocDraft(path, content);
     }
-    writeTauriFile(path, content, fileType)
-      .then(() => {
-        clearTauriFileDirty();
-        // 文件内容已落盘，广播变更让文件面板与白板中的文件引用卡片同步刷新
-        notifyTauriFilesChanged();
-      })
-      .catch((error) => {
-        console.error(`Failed to save ${fileType} file:`, error);
-        showToast({ message: t('toast.tauriFile.saveFailed') });
-      });
-  }, [path, fileType, serialize, showToast, t]);
+  }, [path, serialize]);
 
   const scheduleSave = useCallback(() => {
-    markTauriFileDirty();
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
+    // 被屏蔽的路径（删除/移动中）不标脏也不写草稿
+    if (isTauriFileSaveSuppressed(path)) {
+      return;
     }
-    timerRef.current = window.setTimeout(flushSave, SAVE_DELAY_MS);
-  }, [flushSave]);
+    markTauriFileDirty(path);
+    flushDraft();
+  }, [flushDraft, path]);
 
   const markLoaded = useCallback(() => {
     // 重新打开同名路径的文件（如删除后重建）时恢复自动保存
@@ -66,12 +48,12 @@ export const useDocAutoSave = (
     loadedRef.current = true;
   }, [path]);
 
-  // 卸载（关闭/切换文件）时立即保存未落盘的修改
+  // 卸载（关闭/切换文件）时立即写入草稿，保证未保存修改不丢
   useEffect(() => {
     return () => {
-      flushSave();
+      flushDraft();
     };
-  }, [flushSave]);
+  }, [flushDraft]);
 
   return { scheduleSave, markLoaded };
 };

@@ -37,6 +37,23 @@
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px var(--focus-highlight-color);
     }
+
+    // 名称校验失败：错误态描边（C8）
+    &[aria-invalid='true'] {
+      border-color: var(--color-error);
+
+      &:focus {
+        border-color: var(--color-error);
+        box-shadow: 0 0 0 3px var(--color-error-lighter);
+      }
+    }
+  }
+
+  // 名称校验错误提示（报错后保留输入与焦点，C8）
+  &__error {
+    margin-top: 8px;
+    font-size: var(--dx-font-sm);
+    color: var(--color-error);
   }
 
   &__group {

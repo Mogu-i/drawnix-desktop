@@ -88,7 +88,8 @@
     min-width: var(--radix-select-trigger-width); /* Note: Floating UI might handle width */
     max-height: 300px;
     overflow: hidden;
-    z-index: 1000;
+    // 下拉浮层：需盖住所在弹窗（70）本体，属弹窗附属浮层
+    z-index: 71;
     display: flex;
     flex-direction: column;
 

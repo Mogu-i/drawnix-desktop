@@ -5,7 +5,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    // 面板 Island 的 padding 已收零，这里补回原视觉内边距（原 8px 面板留白 + 12px）
+    padding: 8px 20px;
     border-top: 1px solid var(--dx-border-hairline);
 
     &__spacer {

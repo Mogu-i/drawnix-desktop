@@ -1,0 +1,54 @@
+// 桌面窗口三钮：左邻品牌区，细分隔线隔开；关闭钮危险态红底白图标
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--wb-line);
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--wb-icon-btn);
+    height: var(--wb-icon-btn);
+    padding: 0;
+    border: none;
+    border-radius: var(--wb-r-s);
+    background: transparent;
+    color: var(--wb-text-2);
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    &:hover {
+      background: var(--wb-line-soft);
+      color: var(--wb-text);
+    }
+
+    &:active {
+      color: var(--wb-accent-ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--wb-accent);
+      outline-offset: 1px;
+    }
+
+    &--close:hover {
+      background: var(--wb-danger);
+      color: #fff;
+    }
+
+    &--close:active {
+      color: #fff;
+    }
+  }
+}

@@ -54,18 +54,20 @@ export const SettingsDialog = ({
     }
   }, [open]);
 
-  const handleBrowseDataDir = async () => {
+  // 迁移到指定路径：浏览选择与手动输入共用（E5 路径可编辑）
+  const migrateToDir = async (path: string) => {
+    const trimmed = path.trim();
+    if (!trimmed) {
+      // 空输入：恢复显示当前路径
+      setDataDirState(dataDir);
+      return;
+    }
+    if (trimmed === dataDir) {
+      return;
+    }
     try {
-      const path = await pickDataDir();
-      if (!path) {
-        return;
-      }
-      if (path === dataDir) {
-        showToast({ message: t('settings.dataDirSamePath') });
-        return;
-      }
       setMigrating(true);
-      const result = await setDataDir(path);
+      const result = await setDataDir(trimmed);
       setDataDirState(result.dataDir);
       notifyDataDirChanged();
       showToast({
@@ -79,9 +81,25 @@ export const SettingsDialog = ({
     }
   };
 
+  const handleBrowseDataDir = async () => {
+    try {
+      const path = await pickDataDir();
+      if (!path) {
+        return;
+      }
+      if (path === dataDir) {
+        showToast({ message: t('settings.dataDirSamePath') });
+        return;
+      }
+      await migrateToDir(path);
+    } catch (error) {
+      console.error('Failed to pick folder:', error);
+    }
+  };
+
   const handleTrashDaysChange = (value: number) => {
-    // 至少保留 1 天，与后端约束一致
-    const days = Math.max(1, Math.floor(value) || 1);
+    // 1–90 天，与后端约束一致（E5）
+    const days = Math.min(90, Math.max(1, Math.floor(value) || 1));
     setTrashDays(days);
     setTrashRetentionDays(days).catch((error) => {
       console.error('Failed to save trash retention days:', error);
@@ -125,9 +143,22 @@ export const SettingsDialog = ({
           <div className="settings-dialog__section">
             <div className="settings-dialog__section-label">{t('settings.dataDir')}</div>
             <div className="settings-dialog__data-dir">
-              <span className="settings-dialog__data-dir-path" title={dataDir}>
-                {dataDir || '-'}
-              </span>
+              <input
+                type="text"
+                className="settings-dialog__data-dir-input"
+                value={dataDir}
+                disabled={migrating}
+                aria-label={t('settings.dataDir')}
+                spellCheck={false}
+                onChange={(event) => setDataDirState(event.target.value)}
+                onBlur={(event) => void migrateToDir(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    (event.target as HTMLInputElement).blur();
+                  }
+                }}
+              />
               <button
                 type="button"
                 className="settings-dialog__browse-button"

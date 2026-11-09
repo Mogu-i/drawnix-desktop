@@ -133,6 +133,43 @@
   --keybinding-color: var(--dx-text-tertiary);
   --icon-fill-color: var(--color-on-surface);
 
+  // ---- 工作台 chrome（页签栏 / 右侧文件面板 / 窗口控件）----
+  // 独立 --wb-* 前缀，与画布 token 分离；值来自工作台视觉规格
+  --wb-bg: #f5f6fa;
+  --wb-surface: #ffffff;
+  --wb-stage: #ffffff;
+  --wb-line: #e5e8f0;
+  --wb-line-soft: #eff1f6;
+  --wb-text: #232937;
+  --wb-text-2: #59627a;
+  --wb-text-3: #6f788d;
+  --wb-disabled: #bfc6d4;
+  --wb-accent: #4c7df7;
+  --wb-accent-ink: #3567df;
+  --wb-accent-soft: #edf3ff;
+  --wb-accent-line: #d8e5ff;
+  --wb-warn: #e9a23b;
+  --wb-ok: #35a97a;
+  --wb-danger: #e34b4f;
+  --wb-danger-ink: #c4494c;
+  --wb-r-s: 8px;
+  --wb-r-m: 10px;
+  --wb-r-l: 14px;
+  --wb-shadow-pop: 0 10px 30px rgba(31, 45, 84, 0.1),
+    0 2px 6px rgba(31, 45, 84, 0.05);
+  --wb-font: 'PingFang SC', 'Microsoft YaHei', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  // 品牌头 logo 渐变（140deg 蓝色）
+  --wb-brand-gradient: linear-gradient(140deg, #6c9bff, #3e6fe4);
+  // 工作台常用尺寸（页签栏高度与面板品牌头共用，二者底边线对齐）
+  --wb-tabbar-h: 48px;
+  --wb-sidebar-w: 268px;
+  --wb-tab-h: 32px;
+  --wb-dot-size: 7px;
+  --wb-icon-btn: 32px;
+  --wb-btn-h: 36px;
+  --wb-split-h: 38px;
+
   @media screen and (min-device-width: 1921px) {
     --lg-button-size: 2.5rem;
     --lg-icon-size: 1.25rem;
@@ -169,4 +206,19 @@
   --shadow-island: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
   --dx-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5);
   --dx-shadow-dialog: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+  // 工作台 chrome 暗色映射：表面/文字沿用暗色阶梯，状态色不随主题翻转
+  --wb-bg: #171a1f;
+  --wb-surface: #23262b;
+  --wb-stage: #1b1e22;
+  --wb-line: #33373d;
+  --wb-line-soft: #2a2e34;
+  --wb-text: #e6e8ec;
+  --wb-text-2: #a7adb6;
+  --wb-text-3: #8f96a1;
+  --wb-disabled: #565b62;
+  --wb-accent-soft: #2a3346;
+  --wb-accent-line: #2f3a52;
+  --wb-shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.4);
 }

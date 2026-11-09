@@ -89,6 +89,8 @@ const ruTranslations: Translations = {
   'toast.tauriFile.exportFailed': 'Не удалось экспортировать',
   'toast.tauriFile.deleteFailed': 'Не удалось удалить',
   'toast.tauriFile.restoreFailed': 'Не удалось восстановить',
+  'toast.tauriFile.createFolderFailed':
+    'Не удалось создать папку. Возможно, папка с таким именем уже существует',
   // Language
   'language.switcher': 'Language',
   'language.chinese': '中文',
@@ -149,8 +151,8 @@ const ruTranslations: Translations = {
   'filePanel.newFolder': 'Новая группа',
   'filePanel.newSubFolder': 'Новая подгруппа',
   'filePanel.newFolderPlaceholder': 'Название группы…',
-  'filePanel.folderLocation': 'Группа',
-  'filePanel.defaultLocation': 'Корневая папка',
+  'filePanel.folderLocation': 'Папка',
+  'filePanel.defaultLocation': 'Верхний уровень',
   'filePanel.saveAs': 'Сохранить как',
   'filePanel.exportImage': 'Экспорт в изображение',
   'filePanel.restore': 'Восстановить',
@@ -226,9 +228,9 @@ const ruTranslations: Translations = {
   'deleteConfirm.ok': 'Удалить',
 
   // Delete folder confirm dialog
-  'folderDeleteConfirm.title': 'Удалить группу',
+  'folderDeleteConfirm.title': 'Удалить папку',
   'folderDeleteConfirm.description':
-    'Все файлы группы будут перемещены в корзину и удалены безвозвратно по истечении срока хранения. Продолжить?',
+    'Папка будет удалена, а файлы и вложенные папки внутри будут перенесены на верхний уровень. Продолжить?',
 
   // Move entry dialog
   'moveDialog.title': 'Выберите целевую папку',
@@ -257,12 +259,53 @@ const ruTranslations: Translations = {
   'login.button': 'Войти',
   'login.notAvailable': 'Вход пока недоступен',
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': '思画',
+  'workbench.brand.en': 'DRAWNIX',
+  'workbench.tab.more': 'Ещё',
+  'workbench.tab.dirtySuffix': 'есть несохранённые изменения',
+  'workbench.tab.closeTab': 'Закрыть вкладку',
+  'workbench.tab.collapsePanel': 'Свернуть панель файлов',
+  'workbench.tab.windowMenu': 'Окно',
+  'workbench.window.group': 'Окно',
+  'workbench.window.minimize': 'Свернуть',
+  'workbench.window.maximize': 'Развернуть',
+  'workbench.window.restore': 'Восстановить',
+  'workbench.window.close': 'Закрыть',
+  'workbench.window.minimizeWindow': 'Свернуть окно',
+  'workbench.window.maximizeWindow': 'Развернуть окно',
+  'workbench.window.restoreWindow': 'Восстановить окно',
+  'workbench.window.closeWindow': 'Закрыть окно',
+  'workbench.window.maximizedToast': 'Окно развёрнуто',
+  'workbench.window.restoredToast': 'Возвращено в окно',
+  'workbench.window.recoveredToast': 'Окно восстановлено',
+  'workbench.panel.newBoard': 'Новая доска',
+  'workbench.panel.newTable': 'Новая таблица',
+  'workbench.panel.newMd': 'Новый Markdown',
+  'workbench.panel.newFolder': 'Новая папка',
+  'workbench.panel.newMore': 'Выбрать тип создания',
+  'workbench.panel.folderItems': '{count} эл.',
+  'workbench.create.nameEmpty': 'Введите имя файла',
+  'workbench.create.nameDuplicate': 'Файл с таким именем уже существует. Выберите другое.',
+  'workbench.create.folderLocation': 'Папка',
+  'workbench.save.success': '«{name}» сохранён в локальный файл',
+  'workbench.save.noFile': 'Сначала откройте файл',
+  'workbench.exit.title': 'Выход',
+  'workbench.exit.dirtyDescription':
+    'В {count} файлах есть несохранённые изменения. Содержимое остаётся на этом устройстве, после повторного открытия можно продолжить редактирование.',
+  'workbench.exit.cleanDescription': 'Все файлы сохранены. Вы сможете снова открыть их и продолжить редактирование.',
+  'workbench.exit.cancel': 'Отмена',
+  'workbench.exit.confirm': 'Выйти',
+
   // Welcome page (Tauri desktop)
   'welcome.title': 'Добро пожаловать в Drawnix',
   'welcome.description':
     'Универсальная белая доска: интеллектуальные карты, блок-схемы и рисование от руки. Данные хранятся в локальных файлах.',
   'welcome.newFile': 'Новый файл',
   'welcome.sidebarHint': 'Или откройте существующий файл в панели слева',
+  'welcome.emptyTitle': 'Нет открытых файлов',
+  'welcome.emptyDescription':
+    'Создайте доску, таблицу или Markdown, или выберите файл на панели вкладок сверху.',
 
   // Link popup items
   'popupLink.delLink': 'Удалить ссылку',

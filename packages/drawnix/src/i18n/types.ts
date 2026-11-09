@@ -92,6 +92,7 @@ export interface Translations {
   'toast.tauriFile.exportFailed': string;
   'toast.tauriFile.deleteFailed': string;
   'toast.tauriFile.restoreFailed': string;
+  'toast.tauriFile.createFolderFailed': string;
 
   // Language
   'language.switcher': string;
@@ -255,11 +256,50 @@ export interface Translations {
   'login.button': string;
   'login.notAvailable': string;
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': string;
+  'workbench.brand.en': string;
+  'workbench.tab.more': string;
+  'workbench.tab.dirtySuffix': string;
+  'workbench.tab.closeTab': string;
+  'workbench.tab.collapsePanel': string;
+  'workbench.tab.windowMenu': string;
+  'workbench.window.group': string;
+  'workbench.window.minimize': string;
+  'workbench.window.maximize': string;
+  'workbench.window.restore': string;
+  'workbench.window.close': string;
+  'workbench.window.minimizeWindow': string;
+  'workbench.window.maximizeWindow': string;
+  'workbench.window.restoreWindow': string;
+  'workbench.window.closeWindow': string;
+  'workbench.window.maximizedToast': string;
+  'workbench.window.restoredToast': string;
+  'workbench.window.recoveredToast': string;
+  'workbench.panel.newBoard': string;
+  'workbench.panel.newTable': string;
+  'workbench.panel.newMd': string;
+  'workbench.panel.newFolder': string;
+  'workbench.panel.newMore': string;
+  'workbench.panel.folderItems': string;
+  'workbench.create.nameEmpty': string;
+  'workbench.create.nameDuplicate': string;
+  'workbench.create.folderLocation': string;
+  'workbench.save.success': string;
+  'workbench.save.noFile': string;
+  'workbench.exit.title': string;
+  'workbench.exit.dirtyDescription': string;
+  'workbench.exit.cleanDescription': string;
+  'workbench.exit.cancel': string;
+  'workbench.exit.confirm': string;
+
   // Welcome page (Tauri desktop)
   'welcome.title': string;
   'welcome.description': string;
   'welcome.newFile': string;
   'welcome.sidebarHint': string;
+  'welcome.emptyTitle': string;
+  'welcome.emptyDescription': string;
 
   // Link popup items
   'popupLink.delLink': string;

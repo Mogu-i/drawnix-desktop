@@ -57,7 +57,7 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
 
   const serialize = useCallback(() => textRef.current, []);
 
-  const { scheduleSave, markLoaded } = useDocAutoSave(path, 'md', serialize);
+  const { scheduleSave, markLoaded } = useDocAutoSave(path, serialize);
 
   useEffect(() => {
     let cancelled = false;

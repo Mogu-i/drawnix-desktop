@@ -49,6 +49,10 @@ import { Toast, useToast } from './components/toast/toast';
 import { withCard, migrateLegacyBoardData } from './plugins/card/with-card';
 import { withTextSelection } from './plugins/with-text-selection';
 import { TauriFilePanel } from './components/tauri-file-panel/tauri-file-panel';
+import { TabBar } from './components/tab-bar/tab-bar';
+import { ExitConfirmDialog } from './components/exit-confirm-dialog/exit-confirm-dialog';
+import { setExitConfirmOpen } from './data/workbench-ui';
+import { interceptTauriWindowClose } from './data/tauri-window';
 import { WelcomePage } from './components/welcome-page/welcome-page';
 import { DocEditor } from './components/doc-editor/doc-editor';
 import {
@@ -168,6 +172,26 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [appState.isContentFullscreen]);
+
+  // Tauri 环境：拦截窗口关闭（系统关闭钮 / Alt+F4），先进入退出确认流程（D5）
+  useEffect(() => {
+    if (!isTauriEnvironment()) {
+      return;
+    }
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    interceptTauriWindowClose(() => setExitConfirmOpen(true)).then((unlisten) => {
+      if (cancelled) {
+        unlisten();
+      } else {
+        cleanup = unlisten;
+      }
+    });
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, []);
 
   const hasMountedToolStateRef = useRef(false);
   const onToolStateChangeRef = useRef(onToolStateChange);
@@ -290,40 +314,47 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             }}
             onValueChange={onValueChange}
           >
-            <TauriFilePanel></TauriFilePanel>
-            <div className="drawnix-main">
-              <Board
-                afterInit={(board) => {
-                  const drawnixBoard = board as DrawnixBoard;
-                  applyToolStateToBoard(drawnixBoard, appState.toolState);
-                  setBoard(drawnixBoard);
-                  afterInit?.(board);
-                }}
-              >
-                {tutorial && board && !isTauriEnvironment() && <Tutorial />}
-              </Board>
-              {isDocOpen && currentFile && (
-                <DocEditor
-                  key={currentFile}
-                  path={currentFile}
-                  fileType={currentFileType as 'md' | 'table'}
-                ></DocEditor>
-              )}
-              {!isDocOpen && (
-                <>
-                  <AppToolbar></AppToolbar>
-                  <CreationToolbar></CreationToolbar>
-                  <ZoomToolbar></ZoomToolbar>
-                  <ThemeToolbar></ThemeToolbar>
-                  <PopupToolbar></PopupToolbar>
-                  <LinkPopup></LinkPopup>
-                  <ClosePencilToolbar></ClosePencilToolbar>
-                  <WelcomePage></WelcomePage>
-                </>
-              )}
-              <TTDDialog container={containerRef.current}></TTDDialog>
-              <CleanConfirm container={containerRef.current}></CleanConfirm>
+            {/* 工作台骨架：内容列（页签栏 + 白板区）在左，文件面板在右（A1） */}
+            <div className="wb-main">
+              <div className="wb-content">
+                <TabBar />
+                <div className="drawnix-main">
+                  <Board
+                    afterInit={(board) => {
+                      const drawnixBoard = board as DrawnixBoard;
+                      applyToolStateToBoard(drawnixBoard, appState.toolState);
+                      setBoard(drawnixBoard);
+                      afterInit?.(board);
+                    }}
+                  >
+                    {tutorial && board && !isTauriEnvironment() && <Tutorial />}
+                  </Board>
+                  {isDocOpen && currentFile && (
+                    <DocEditor
+                      key={currentFile}
+                      path={currentFile}
+                      fileType={currentFileType as 'md' | 'table'}
+                    ></DocEditor>
+                  )}
+                  {!isDocOpen && (
+                    <>
+                      <AppToolbar></AppToolbar>
+                      <CreationToolbar></CreationToolbar>
+                      <ZoomToolbar></ZoomToolbar>
+                      <ThemeToolbar></ThemeToolbar>
+                      <PopupToolbar></PopupToolbar>
+                      <LinkPopup></LinkPopup>
+                      <ClosePencilToolbar></ClosePencilToolbar>
+                      <WelcomePage></WelcomePage>
+                    </>
+                  )}
+                  <TTDDialog container={containerRef.current}></TTDDialog>
+                  <CleanConfirm container={containerRef.current}></CleanConfirm>
+                </div>
+              </div>
+              <TauriFilePanel></TauriFilePanel>
             </div>
+            <ExitConfirmDialog container={containerRef.current} />
             <Toast toast={toast} container={containerRef.current}></Toast>
           </Wrapper>
           <canvas className={`${LASER_POINTER_CLASS_NAME} mouse-course-hidden`}></canvas>

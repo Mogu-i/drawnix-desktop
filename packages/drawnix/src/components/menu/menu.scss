@@ -168,6 +168,16 @@
         border-color: transparent;
       }
 
+      // 危险动作项（如窄屏窗口菜单的「关闭窗口」，对齐原型 r3-final）
+      &--danger {
+        color: var(--wb-danger-ink);
+
+        &:hover {
+          background-color: rgba(227, 75, 79, 0.08);
+          color: var(--wb-danger-ink);
+        }
+      }
+
       svg {
         width: 1rem;
         height: 1rem;

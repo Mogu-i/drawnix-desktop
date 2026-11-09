@@ -217,7 +217,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     []
   );
 
-  const { scheduleSave, markLoaded } = useDocAutoSave(path, 'table', serialize);
+  const { scheduleSave, markLoaded } = useDocAutoSave(path, serialize);
 
   useEffect(() => {
     let cancelled = false;
@@ -548,7 +548,7 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 选中态键盘处理：Enter 进入编辑，Tab/方向键切换单元格；
   // 编辑态按键由单元格内的 textarea 自行处理（此处冒泡时已在编辑中，直接忽略）
   const handleTableKeyDown = (event: React.KeyboardEvent) => {
-    if (editing || !sel || event.ctrlKey || event.altKey || event.metaKey) {
+    if (editing || !data || !sel || event.ctrlKey || event.altKey || event.metaKey) {
       return;
     }
     switch (event.key) {

@@ -1,9 +1,9 @@
 // 文档编辑器覆盖层：铺满右侧主内容区，盖在白板与工具栏之上
-// （低于弹窗 z-index:1000 与欢迎页 z-index:500，保证面板弹窗可正常展示）
+// （低于欢迎页 50、窄屏抽屉 62 与弹窗 70，保证欢迎页与弹窗可正常展示）
 .doc-editor {
   position: absolute;
   inset: 0;
-  z-index: 100;
+  z-index: 30;
   display: flex;
   flex-direction: column;
   background: var(--island-bg-color);
