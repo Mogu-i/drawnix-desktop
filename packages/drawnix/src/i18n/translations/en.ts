@@ -40,6 +40,8 @@ const enTranslations: Translations = {
   'zoom.100': 'Zoom to 100%',
   'zoom.fullscreen': 'Fullscreen',
   'zoom.exitFullscreen': 'Exit Fullscreen',
+  'zoom.showToolbar': 'Show toolbar',
+  'zoom.hideToolbar': 'Hide toolbar',
 
   // Themes
   'theme.default': 'Default',
@@ -214,9 +216,6 @@ const enTranslations: Translations = {
   'markdown.tableTemplate': '| Header 1 | Header 2 | Header 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'link text',
   'markdown.imagePlaceholder': 'image alt',
-
-  // Doc editor overlay
-  'docEditor.close': 'Close',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Delete file',

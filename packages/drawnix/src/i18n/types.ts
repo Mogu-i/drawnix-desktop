@@ -44,6 +44,8 @@ export interface Translations {
   'zoom.100': string;
   'zoom.fullscreen': string;
   'zoom.exitFullscreen': string;
+  'zoom.showToolbar': string;
+  'zoom.hideToolbar': string;
 
   // Themes
   'theme.default': string;
@@ -218,9 +220,6 @@ export interface Translations {
   'markdown.tableTemplate': string;
   'markdown.linkPlaceholder': string;
   'markdown.imagePlaceholder': string;
-
-  // Doc editor overlay
-  'docEditor.close': string;
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': string;

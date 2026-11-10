@@ -51,9 +51,10 @@ export const useTauriFileActions = () => {
     [board, listRender]
   );
 
-  /** 打开文件：切换前把当前白板内容存为快照，白板文件优先用快照恢复未保存内容 */
+  /** 打开文件：切换前把当前白板内容存为快照，白板文件优先用快照恢复未保存内容；
+   *  返回是否成功加载（供启动恢复判断，文档类型无加载动作视为成功） */
   const openFile = useCallback(
-    async (path: string, ext: string) => {
+    async (path: string, ext: string): Promise<boolean> => {
       const fileType = normalizeTauriFileType(ext) ?? 'drawnix';
       const state = getTauriFileState();
       if (state.currentFile && state.currentFile !== path && state.fileType === 'drawnix') {
@@ -67,11 +68,14 @@ export const useTauriFileActions = () => {
           const content = snapshot ?? (await readTauriFile(path, 'drawnix'));
           const { elements, viewport, theme } = parseTauriFileContent(content);
           clearAndLoad(elements as PlaitElement[], viewport, theme);
+          return true;
         } catch (error) {
           console.error('Failed to open file:', error);
           showToast({ message: t('toast.tauriFile.loadFailed') });
+          return false;
         }
       }
+      return true;
     },
     [board, clearAndLoad, showToast, t]
   );

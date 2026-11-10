@@ -181,12 +181,12 @@
     }
 
     // 右侧内容展示区全屏（铺满窗口）模式：
-    // 内容区绝对定位铺满整个窗口，其余悬浮 UI（页签栏、文件面板、顶部/底部工具栏等）淡出隐藏；
-    // 缩放工具栏内仅保留全屏/退出按钮以便退出
+    // 内容区绝对定位铺满整个窗口，页签栏/文件面板/顶部与底部工具栏等淡出隐藏；
+    // 创作工具栏（文本/形状/导图/连线）保留，可随时演示标注，
+    // 通过缩放工具栏按钮或 Ctrl+\ 切换显隐；缩放工具栏内仅保留退出按钮
     .tab-bar,
     .tauri-file-panel,
     .app-toolbar,
-    .draw-toolbar,
     .theme-toolbar,
     .pencil-mode-toolbar {
         transition: opacity 0.25s ease, visibility 0.25s ease;
@@ -197,10 +197,10 @@
     }
 
     &.drawnix--content-fullscreen {
-        position: relative;
-
         .drawnix-main {
-            position: absolute;
+            // fixed 相对视口铺满整个窗口：wb-content 是 relative 定位祖先，
+            // 若用 absolute 只会铺满内容列，右侧文件面板区域盖不到（露出透明背景）
+            position: fixed;
             inset: 0;
             z-index: 20;
             background-color: var(--island-bg-color);
@@ -210,9 +210,15 @@
         .tab-bar,
         .tauri-file-panel,
         .app-toolbar,
-        .draw-toolbar,
         .theme-toolbar,
         .pencil-mode-toolbar {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        // 全屏隐藏创作工具栏（切换按钮或 Ctrl+\ 触发），回到纯沉浸画面
+        &.drawnix--fullscreen-toolbar-hidden .draw-toolbar {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -223,6 +229,15 @@
             .zoom-in-button,
             .zoom-menu-trigger {
                 display: none;
+            }
+
+            // 仅保留的退出全屏按钮平时大幅弱化（低透明度），
+            // 悬停右上角时恢复完全不透明，兼顾沉浸感与可发现性
+            opacity: 0.3;
+            transition: opacity 0.2s ease;
+
+            &:hover {
+                opacity: 1;
             }
         }
     }

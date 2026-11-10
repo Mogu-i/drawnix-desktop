@@ -3,6 +3,7 @@ import {
   PlaitBoard,
   PlaitBoardOptions,
   PlaitElement,
+  PlaitOperation,
   PlaitPlugin,
   PlaitPointerType,
   PlaitTheme,
@@ -55,6 +56,7 @@ import { setExitConfirmOpen } from './data/workbench-ui';
 import { interceptTauriWindowClose } from './data/tauri-window';
 import { WelcomePage } from './components/welcome-page/welcome-page';
 import { DocEditor } from './components/doc-editor/doc-editor';
+import { RestoreOpenedFile } from './components/restore-opened-file/restore-opened-file';
 import {
   isTauriEnvironment,
   markTauriFileDirty,
@@ -130,6 +132,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       isMobile: md.mobile() !== null,
       isPencilMode: false,
       isContentFullscreen: false,
+      isFullscreenToolbarVisible: true,
       fileHandle: null,
       openDialogType: null,
       openCleanConfirm: false,
@@ -157,7 +160,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     setBoardLanguage(board, lastKnownLanguageRef.current);
   }, [board]);
 
-  // 内容区全屏（铺满窗口）时按 Esc 退出
+  // 内容区全屏（铺满窗口）时按 Esc 退出，Ctrl+\ 切换创作工具栏显隐
   useEffect(() => {
     if (!appState.isContentFullscreen) {
       return;
@@ -165,6 +168,17 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setAppState((current) => ({ ...current, isContentFullscreen: false }));
+      }
+      // Ctrl+\（沿用 Figma「显示/隐藏 UI」惯例）：全屏时在沉浸画面与可标注工具栏间切换
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        (event.key === '\\' || event.code === 'Backslash')
+      ) {
+        event.preventDefault();
+        setAppState((current) => ({
+          ...current,
+          isFullscreenToolbarVisible: !current.isFullscreenToolbarVisible,
+        }));
       }
     };
     window.addEventListener('keydown', closeOnEscape);
@@ -292,6 +306,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
           className={classNames('drawnix', {
             'drawnix--mobile': appState.isMobile,
             'drawnix--content-fullscreen': appState.isContentFullscreen,
+            'drawnix--fullscreen-toolbar-hidden': !appState.isFullscreenToolbarVisible,
             [`theme--${themeColorMode}`]: themeColorMode,
           })}
           ref={containerRef}
@@ -303,7 +318,18 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             options={options}
             plugins={plugins}
             onChange={(data: BoardChangeData) => {
-              markTauriFileDirty();
+              // 仅元素内容变化才标脏：框选/滚动/主题切换等也会触发 onChange，
+              // 不加区分会把未编辑的文件误标为有未保存修改（假脏橙点、
+              // 切换文件时触发无谓写盘，重启后还可能残留误导性的未保存状态）
+              const hasContentChange = data.operations.some(
+                (op) =>
+                  !PlaitOperation.isSetSelectionOperation(op) &&
+                  !PlaitOperation.isSetViewportOperation(op) &&
+                  !PlaitOperation.isSetThemeOperation(op)
+              );
+              if (hasContentChange) {
+                markTauriFileDirty();
+              }
               onChange?.(data);
             }}
             onSelectionChange={onSelectionChange}
@@ -336,6 +362,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                       fileType={currentFileType as 'md' | 'table'}
                     ></DocEditor>
                   )}
+                  <RestoreOpenedFile />
                   {!isDocOpen && (
                     <>
                       <AppToolbar></AppToolbar>

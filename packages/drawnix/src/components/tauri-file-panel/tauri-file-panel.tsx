@@ -51,7 +51,6 @@ import {
   renameTauriFolder,
   reorderTauriItems,
   resumeTauriFileSave,
-  retargetDocEditorSessionPath,
   restoreTauriFile,
   saveToTauriFile,
   setCurrentTauriFile,
@@ -354,8 +353,8 @@ export const TauriFilePanel = () => {
 
   // ----- 移动/重命名对当前打开文档的保护 -----
   // 文档编辑器的防抖保存与卸载 flushSave 按路径回写：被移动/重命名的文档
-  // 若不先屏蔽旧路径，回写会在旧位置重建文件；操作成功后把当前文件与
-  // 编辑器会话切到新路径，失败则解除屏蔽，避免吞掉后续合法保存
+  // 若不先屏蔽旧路径，回写会在旧位置重建文件；操作成功后把当前文件
+  // 切到新路径，失败则解除屏蔽，避免吞掉后续合法保存
 
   /** 返回命中的当前打开文档路径：精确匹配（ext 给出时要求文件类型一致），或（prefix 时）位于分组前缀下。
       同名不同类型文件的路径相同（不含扩展名），判别时需连同文件类型一起比较 */
@@ -369,9 +368,8 @@ export const TauriFilePanel = () => {
     return prefix && currentFile.startsWith(`${from}/`) ? currentFile : null;
   };
 
-  /** 移动/重命名成功后把当前文档切换到新路径，并同步编辑器会话路径 */
-  const retargetCurrentDoc = (oldPath: string, newPath: string) => {
-    retargetDocEditorSessionPath(oldPath, newPath);
+  /** 移动/重命名成功后把当前文档切换到新路径 */
+  const retargetCurrentDoc = (newPath: string) => {
     setCurrentTauriFile(newPath, currentFileType);
   };
 
@@ -580,7 +578,7 @@ export const TauriFilePanel = () => {
         syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
         notifyTauriFilesChanged();
         if (docOldPath) {
-          retargetCurrentDoc(docOldPath, newPath);
+          retargetCurrentDoc(newPath);
         }
       } else {
         const newPath = joinPath(targetDir, lastSeg(target.path));
@@ -589,7 +587,7 @@ export const TauriFilePanel = () => {
         syncFileRefCardPaths(board, [{ from: target.path, to: newPath }]);
         notifyTauriFilesChanged();
         if (docOldPath) {
-          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(target.path.length)}`);
+          retargetCurrentDoc(`${newPath}${docOldPath.slice(target.path.length)}`);
         }
       }
       refreshTree();
@@ -682,7 +680,7 @@ export const TauriFilePanel = () => {
       ]);
       notifyTauriFilesChanged();
       if (docOldPath) {
-        retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(dirPath.length)}`);
+        retargetCurrentDoc(`${newPath}${docOldPath.slice(dirPath.length)}`);
       }
       refreshTree();
     } catch (error) {
@@ -717,7 +715,7 @@ export const TauriFilePanel = () => {
       syncFileRefCardPaths(board, [{ from: oldPath, to: newPath }]);
       notifyTauriFilesChanged();
       if (isCurrentDoc) {
-        retargetCurrentDoc(oldPath, newPath);
+        retargetCurrentDoc(newPath);
       }
       refreshTree();
     } catch (error) {
@@ -797,9 +795,9 @@ export const TauriFilePanel = () => {
           { from: path, to: newPath },
         ]);
         notifyTauriFilesChanged();
-        // 同步当前文件与编辑器会话到新路径，避免后续保存写回旧路径
+        // 同步当前文件到新路径，避免后续保存写回旧路径
         if (isCurrentDoc) {
-          retargetCurrentDoc(path, newPath);
+          retargetCurrentDoc(newPath);
         }
         refreshTree();
       })
@@ -831,7 +829,7 @@ export const TauriFilePanel = () => {
         ]);
         notifyTauriFilesChanged();
         if (docOldPath) {
-          retargetCurrentDoc(docOldPath, `${newPath}${docOldPath.slice(path.length)}`);
+          retargetCurrentDoc(`${newPath}${docOldPath.slice(path.length)}`);
         }
         refreshTree();
       })

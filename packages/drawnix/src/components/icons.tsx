@@ -304,6 +304,23 @@ export const ExitFullscreenIcon = createIcon(
   </svg>
 );
 
+/** 顶部工具栏（全屏模式下「工具栏显隐」切换钮专用） */
+export const ToolbarIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <g strokeWidth="1.5">
+      <rect x="2.5" y="7.5" width="19" height="9" rx="2"></rect>
+      <path d="M6.5 12h2.5M11 12h2.5M15.5 12h2.5"></path>
+    </g>
+  </svg>
+);
+
 export const SaveIcon = createIcon(
   <svg
     viewBox="0 0 24 24"

@@ -383,21 +383,21 @@ export const setCurrentTauriFile = (
   name: string | null,
   fileType: TauriFileType = DEFAULT_FILE_TYPE
 ) => {
-  // 打开其他文件时丢弃未完成的 DocEditor 会话，避免关闭时恢复过期路径
-  if (docEditorSession && name !== docEditorSession.docPath) {
-    docEditorSession = null;
-  }
   // 打开文件时解除该路径的历史保存屏蔽（如旧路径曾删除/移动后重建同名文件），
   // 避免残留屏蔽静默丢弃新文件的保存
   if (name) {
     resumeTauriFileSave(name);
   }
   suppressDirtyUntil = Date.now() + 500;
-  // 维护页签列表：未打开过则追加为新页签
-  const openTabs =
-    name && !state.openTabs.some((tab) => tab.path === name)
-      ? [...state.openTabs, { path: name, fileType }]
-      : state.openTabs;
+  // 维护页签列表：未打开过则追加为新页签；同名不同类型的文件共用无扩展名路径，
+  // 页签类型需跟随本次打开者，否则重启恢复时会按旧类型打开（白板被误恢复成文档编辑器）
+  const openTabs = name
+    ? state.openTabs.some((tab) => tab.path === name)
+      ? state.openTabs.map((tab) =>
+          tab.path === name ? { path: name, fileType } : tab
+        )
+      : [...state.openTabs, { path: name, fileType }]
+    : state.openTabs;
   setState({ currentFile: name, fileType, openTabs });
 };
 
@@ -608,9 +608,6 @@ export const closeTauriTab = (path: string): string | null => {
   delete dirty[path];
   delete docDrafts[path];
   boardSnapshots.delete(path);
-  if (docEditorSession?.docPath === path) {
-    docEditorSession = null;
-  }
   setState({ openTabs, currentFile, fileType, dirty });
   if (wasActive && currentFile) {
     suppressDirtyUntil = Date.now() + 500;
@@ -639,9 +636,6 @@ export const renameTauriTabPath = (from: string, to: string, fileType?: TauriFil
   if (snapshot !== undefined) {
     boardSnapshots.set(to, snapshot);
     boardSnapshots.delete(from);
-  }
-  if (docEditorSession?.docPath === from) {
-    docEditorSession = { ...docEditorSession, docPath: to };
   }
   if (saveSuppressedPaths.has(from)) {
     saveSuppressedPaths.delete(from);
@@ -723,51 +717,3 @@ export const flushAllTauriDirtyFiles = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// DocEditor 会话：从白板（如双击文件引用卡片）进入文档编辑器时，
-// 记录进入前的当前白板文件，关闭编辑器后恢复白板上下文
-// ---------------------------------------------------------------------------
-
-type DocEditorSession = {
-  /** 打开的文档相对路径 */
-  docPath: string;
-  /** 进入编辑器前的当前文件，null 表示之前未打开任何文件 */
-  returnFile: { path: string; fileType: TauriFileType } | null;
-};
-
-let docEditorSession: DocEditorSession | null = null;
-
-/** 打开 Markdown/表格文件的文档编辑器，并记录关闭后需要恢复的文件 */
-export const openTauriDocEditor = (path: string, fileType: 'md' | 'table') => {
-  const current = state.currentFile;
-  docEditorSession = {
-    docPath: path,
-    returnFile:
-      current && current !== path
-        ? { path: current, fileType: state.fileType }
-        : null,
-  };
-  setCurrentTauriFile(path, fileType);
-};
-
-/** 关闭文档编辑器；若是从白板进入则恢复之前的白板文件上下文 */
-export const closeTauriDocEditor = () => {
-  const session = docEditorSession;
-  docEditorSession = null;
-  if (session?.returnFile) {
-    setCurrentTauriFile(session.returnFile.path, session.returnFile.fileType);
-  } else {
-    setCurrentTauriFile(null);
-  }
-};
-
-/**
- * 文档编辑器会话中的文档被移动/重命名后同步会话路径；
- * 否则 setCurrentTauriFile(newPath) 会因路径不匹配丢弃会话，
- * 关闭编辑器后无法恢复白板上下文
- */
-export const retargetDocEditorSessionPath = (from: string, to: string) => {
-  if (docEditorSession?.docPath === from) {
-    docEditorSession = { ...docEditorSession, docPath: to };
-  }
-};

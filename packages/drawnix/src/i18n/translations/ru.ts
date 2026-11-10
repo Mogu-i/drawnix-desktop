@@ -40,6 +40,8 @@ const ruTranslations: Translations = {
   'zoom.100': 'Сбросить к 100%',
   'zoom.fullscreen': 'Во весь экран',
   'zoom.exitFullscreen': 'Выйти из полноэкранного режима',
+  'zoom.showToolbar': 'Показать панель инструментов',
+  'zoom.hideToolbar': 'Скрыть панель инструментов',
 
   // Themes
   'theme.default': 'Стандартная',
@@ -217,9 +219,6 @@ const ruTranslations: Translations = {
   'markdown.tableTemplate': '| Заголовок 1 | Заголовок 2 | Заголовок 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'текст ссылки',
   'markdown.imagePlaceholder': 'описание изображения',
-
-  // Doc editor overlay
-  'docEditor.close': 'Закрыть',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Удалить файл',

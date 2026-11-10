@@ -1,5 +1,6 @@
 // 文档编辑器覆盖层：铺满右侧主内容区，盖在白板与工具栏之上
-// （低于欢迎页 50、窄屏抽屉 62 与弹窗 70，保证欢迎页与弹窗可正常展示）
+// （低于欢迎页 50、窄屏抽屉 62 与弹窗 70，保证欢迎页与弹窗可正常展示）。
+// 文件名、类型与未保存状态由页签栏展示，这里仅承载编辑器本体
 .doc-editor {
   position: absolute;
   inset: 0;
@@ -8,66 +9,6 @@
   flex-direction: column;
   background: var(--island-bg-color);
   color: var(--color-on-surface);
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    height: 48px;
-    padding: 0 16px;
-    border-bottom: 1px solid var(--dx-border-hairline);
-    flex: 0 0 auto;
-  }
-
-  &__badge {
-    font-size: var(--dx-font-xs);
-    line-height: 1;
-    letter-spacing: 0.2px;
-    padding: 5px 9px;
-    border-radius: var(--dx-radius-full);
-    background: var(--color-surface-secondary-container);
-    color: var(--color-on-surface-muted);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  &__filename {
-    flex: 1;
-    min-width: 0;
-    font-size: var(--dx-font-base);
-    font-weight: 600;
-    color: var(--color-on-surface);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__close {
-    flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--dx-font-sm);
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-md);
-    background: transparent;
-    color: var(--color-on-surface-muted);
-    cursor: pointer;
-    transition: background-color var(--dx-duration-fast) var(--dx-ease),
-      color var(--dx-duration-fast) var(--dx-ease);
-
-    &:hover {
-      background: var(--color-surface-high);
-      color: var(--color-on-surface);
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px var(--focus-highlight-color);
-    }
-  }
 
   &__placeholder {
     flex: 1;

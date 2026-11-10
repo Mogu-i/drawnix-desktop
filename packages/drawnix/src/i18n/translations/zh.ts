@@ -40,6 +40,8 @@ const zhTranslations: Translations = {
   'zoom.100': '缩放至 100%',
   'zoom.fullscreen': '全屏',
   'zoom.exitFullscreen': '退出全屏',
+  'zoom.showToolbar': '显示工具栏',
+  'zoom.hideToolbar': '隐藏工具栏',
 
   // Themes
   'theme.default': '默认',
@@ -215,9 +217,6 @@ const zhTranslations: Translations = {
   'markdown.tableTemplate': '| 表头 1 | 表头 2 | 表头 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': '链接文字',
   'markdown.imagePlaceholder': '图片描述',
-
-  // Doc editor overlay
-  'docEditor.close': '关闭',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': '删除文件',

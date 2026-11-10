@@ -39,6 +39,8 @@ const arTranslations: Translations = {
   'zoom.100': 'تكبير إلى 100%',
   'zoom.fullscreen': 'ملء الشاشة',
   'zoom.exitFullscreen': 'إنهاء ملء الشاشة',
+  'zoom.showToolbar': 'إظهار شريط الأدوات',
+  'zoom.hideToolbar': 'إخفاء شريط الأدوات',
 
   // Themes
   'theme.default': 'افتراضي',
@@ -215,9 +217,6 @@ const arTranslations: Translations = {
   'markdown.tableTemplate': '| العنوان 1 | العنوان 2 | العنوان 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'نص الرابط',
   'markdown.imagePlaceholder': 'وصف الصورة',
-
-  // Doc editor overlay
-  'docEditor.close': 'إغلاق',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'حذف الملف',

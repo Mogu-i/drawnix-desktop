@@ -40,6 +40,8 @@ const viTranslations: Translations = {
   'zoom.100': 'Zoom 100%',
   'zoom.fullscreen': 'Toàn màn hình',
   'zoom.exitFullscreen': 'Thoát toàn màn hình',
+  'zoom.showToolbar': 'Hiện thanh công cụ',
+  'zoom.hideToolbar': 'Ẩn thanh công cụ',
 
   // Themes
   'theme.default': 'Mặc định',
@@ -216,9 +218,6 @@ const viTranslations: Translations = {
   'markdown.tableTemplate': '| Tiêu đề 1 | Tiêu đề 2 | Tiêu đề 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'chữ liên kết',
   'markdown.imagePlaceholder': 'mô tả hình ảnh',
-
-  // Doc editor overlay
-  'docEditor.close': 'Đóng',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Xóa tệp',
