@@ -3,147 +3,55 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  // 作为工具岛定位壳与选区提示的定位基准
+  position: relative;
 
-  &__toolbar {
-    flex: 0 0 auto;
+  // 工具岛定位壳：窄屏收纳后左右贴边。
+  // 注：drawnix--mobile 加在 .drawnix 根上，本文件规则不在 .drawnix 内嵌套，
+  // isMobile mixin 会展开成同元素类拼接（永不匹配），故用后代选择器
+  &__island-wrap {
+    .drawnix--mobile & {
+      left: 12px;
+      right: 12px;
+    }
+  }
+
+  // 选区气泡：fixed 定位由 floating-ui 内联提供，
+  // 窄屏不显示（触屏上悬浮易遮挡选区）
+  &__bubble {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 16px;
-    background: var(--color-surface-mid);
-    border-bottom: 1px solid var(--dx-border-hairline);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+
+    .drawnix--mobile & {
+      display: none;
+    }
   }
 
-  &__tool-button {
-    height: 30px;
-    font-size: var(--dx-font-sm);
-    padding: 0 12px;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-md);
+  // 挂在气泡下方的选区短提示（单格坐标 / 多格数量）
+  &__bubble-note {
     background: var(--island-bg-color);
-    color: var(--color-on-surface);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color var(--dx-duration-fast) var(--dx-ease),
-      color var(--dx-duration-fast) var(--dx-ease),
-      border-color var(--dx-duration-fast) var(--dx-ease);
-
-    &:hover:not(:disabled) {
-      background: var(--color-surface-high);
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px var(--focus-highlight-color);
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
-    }
-
-    // 对齐等图标按钮
-    &--icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 30px;
-      padding: 0;
-    }
-
-    // 当前生效的对齐方式高亮
-    // 提高特异度，避免划过时被 :hover:not(:disabled) 覆盖导致高亮消失
-    &--active,
-    &--active:hover:not(:disabled) {
-      background: var(--color-surface-primary-container);
-      color: var(--color-primary-darker);
-    }
-  }
-
-  &__align-icon {
-    display: block;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    fill: none;
-  }
-
-  // 加粗/下划线/删除线按钮的字形图标
-  &__effect-icon {
-    display: block;
-    width: 16px;
-    font-size: var(--dx-font-sm);
-    line-height: 16px;
-    text-align: center;
-
-    &--bold {
-      font-weight: 700;
-    }
-
-    &--underline {
-      text-decoration: underline;
-    }
-
-    &--strikethrough {
-      text-decoration: line-through;
-    }
-  }
-
-  &__tool-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--dx-font-sm);
-    color: var(--color-on-surface-muted);
-
-    select {
-      height: 30px;
-      font-size: var(--dx-font-sm);
-      padding: 0 8px;
-      border: 1px solid var(--dx-border-strong);
-      border-radius: var(--border-radius-md);
-      background: var(--island-bg-color);
-      color: var(--color-on-surface);
-      outline: none;
-      cursor: pointer;
-
-      &:focus-visible {
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 2px var(--focus-highlight-color);
-      }
-    }
-
-    &--color {
-      input[type='color'] {
-        width: 30px;
-        height: 30px;
-        padding: 0;
-        border: 1px solid var(--dx-border-strong);
-        border-radius: var(--border-radius-md);
-        background: transparent;
-        cursor: pointer;
-      }
-    }
-  }
-
-  &__separator {
-    width: 1px;
-    height: 20px;
-    background: var(--dx-border-strong);
-  }
-
-  &__hint {
-    margin-left: auto;
+    border: 1px solid var(--island-border-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--dx-shadow-popover);
+    padding: 3px 9px;
     font-size: var(--dx-font-xs);
     color: var(--dx-text-tertiary);
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   &__canvas {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 16px;
+    // 顶部让出工具岛高度，岛不遮正文
+    padding: 84px 24px 24px;
+
+    .drawnix--mobile & {
+      padding: 84px 12px 12px;
+    }
   }
 
   &__table-wrap {
@@ -224,10 +132,20 @@
     cursor: cell;
     user-select: none;
 
-    &--selected {
-      outline: 2px solid var(--color-primary, #4a90e2);
-      outline-offset: -2px;
-    }
+    // --selected 不承载视觉样式：选区外观由 __selection-overlay 统一绘制，
+    // 此类仅作为选区气泡/覆盖层测量的 DOM 钩子
+  }
+
+  // 选区覆盖层：对齐选中 td 的并集矩形，WPS 式选区——
+  // 最外一圈连续边框 + 内部半透明颜色覆盖（网格线与内容透出可见）；
+  // 不拦截鼠标，单元格点击/拖拽选择不受影响
+  &__selection-overlay {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 2px solid var(--color-primary, #4a90e2);
+    background: var(--color-surface-primary-container);
   }
 
   // 展示态文字与编辑态镜像共用同一套排版规则，

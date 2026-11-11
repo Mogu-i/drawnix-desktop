@@ -194,6 +194,20 @@ const ruTranslations: Translations = {
   'table.underline': 'Подчёркнутый',
   'table.strikethrough': 'Зачёркнутый',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'Строки и столбцы',
+  'table.toolbar.merge': 'Объединение',
+  'table.toolbar.align': 'Выравнивание',
+  'table.toolbar.more': 'Ещё',
+  'table.toolbar.help': 'Справка',
+  'table.help.title': 'Подсказки',
+  'table.disabled.row': 'Должна остаться хотя бы одна строка',
+  'table.disabled.col': 'Должен остаться хотя бы один столбец',
+  'table.disabled.merge': 'Выберите несколько ячеек, чтобы объединить их',
+  'table.disabled.unmerge': 'В выделении нет объединённых ячеек',
+  'table.selectionOne': 'Выбрано {cell} · 1 ячейка',
+  'table.selectionMany': 'Выбрано ячеек: {count}',
+
   // Markdown editor
   'markdown.placeholder': 'Введите Markdown здесь…',
   'markdown.mode.label': 'Режим просмотра',
@@ -219,6 +233,14 @@ const ruTranslations: Translations = {
   'markdown.tableTemplate': '| Заголовок 1 | Заголовок 2 | Заголовок 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'текст ссылки',
   'markdown.imagePlaceholder': 'описание изображения',
+
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'Вставить',
+  'markdown.toolbar.more': 'Ещё',
+  'markdown.toolbar.disabled': 'Станет доступно после загрузки файла',
+  'markdown.help.title': 'Подсказки',
+  'markdown.help.indent': 'Tab — увеличить отступ выделенных строк, Shift+Tab — уменьшить',
+  'markdown.help.list': 'Нажмите Enter в начале строки списка или цитаты, чтобы продолжить её',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Удалить файл',

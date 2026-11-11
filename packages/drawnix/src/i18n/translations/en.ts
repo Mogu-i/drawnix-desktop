@@ -191,6 +191,20 @@ const enTranslations: Translations = {
   'table.underline': 'Underline',
   'table.strikethrough': 'Strikethrough',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'Rows & Columns',
+  'table.toolbar.merge': 'Merge',
+  'table.toolbar.align': 'Alignment',
+  'table.toolbar.more': 'More',
+  'table.toolbar.help': 'Help',
+  'table.help.title': 'Tips',
+  'table.disabled.row': 'At least one row must remain',
+  'table.disabled.col': 'At least one column must remain',
+  'table.disabled.merge': 'Select multiple cells to merge them',
+  'table.disabled.unmerge': 'No merged cells in the selection to unmerge',
+  'table.selectionOne': 'Selected {cell} · 1 cell',
+  'table.selectionMany': 'Selected {count} cells',
+
   // Markdown editor
   'markdown.placeholder': 'Type Markdown here…',
   'markdown.mode.label': 'View mode',
@@ -216,6 +230,14 @@ const enTranslations: Translations = {
   'markdown.tableTemplate': '| Header 1 | Header 2 | Header 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'link text',
   'markdown.imagePlaceholder': 'image alt',
+
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'Insert',
+  'markdown.toolbar.more': 'More',
+  'markdown.toolbar.disabled': 'Available after the file loads',
+  'markdown.help.title': 'Tips',
+  'markdown.help.indent': 'Press Tab to indent the selected lines, Shift+Tab to outdent',
+  'markdown.help.list': 'Press Enter at the start of a list or quote line to continue its prefix',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Delete file',

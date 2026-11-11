@@ -194,6 +194,19 @@ export interface Translations {
   'table.bold': string;
   'table.underline': string;
   'table.strikethrough': string;
+  // Table editor toolbar island
+  'table.toolbar.rows': string;
+  'table.toolbar.merge': string;
+  'table.toolbar.align': string;
+  'table.toolbar.more': string;
+  'table.toolbar.help': string;
+  'table.help.title': string;
+  'table.disabled.row': string;
+  'table.disabled.col': string;
+  'table.disabled.merge': string;
+  'table.disabled.unmerge': string;
+  'table.selectionOne': string;
+  'table.selectionMany': string;
 
   // Markdown editor
   'markdown.placeholder': string;
@@ -220,6 +233,13 @@ export interface Translations {
   'markdown.tableTemplate': string;
   'markdown.linkPlaceholder': string;
   'markdown.imagePlaceholder': string;
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': string;
+  'markdown.toolbar.more': string;
+  'markdown.toolbar.disabled': string;
+  'markdown.help.title': string;
+  'markdown.help.indent': string;
+  'markdown.help.list': string;
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': string;

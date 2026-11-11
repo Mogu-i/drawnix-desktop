@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { readTauriFile } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
-import type { Translations } from '../../i18n/types';
 import { useDocAutoSave } from './use-doc-auto-save';
 import {
   applyMarkdownAction,
@@ -12,39 +11,17 @@ import {
   toggleTaskItem,
 } from './markdown-format';
 import { renderMarkdownToHtml } from './markdown-render';
-import { MarkdownToolbar } from './markdown-toolbar';
+import {
+  loadViewMode,
+  MarkdownViewMode,
+  MarkdownToolbar,
+  VIEW_MODES,
+} from './markdown-toolbar';
 import './markdown-editor.scss';
 
-/** 视图模式：源码 / 分屏 / 预览 */
-type MarkdownViewMode = 'code' | 'split' | 'preview';
-
-// 记住用户上一次选择的视图模式，下次打开时作为默认值
-const VIEW_MODE_STORAGE_KEY = 'markdown_editor_view_mode';
-const DEFAULT_VIEW_MODE: MarkdownViewMode = 'split';
-
-const VIEW_MODES: { value: MarkdownViewMode; labelKey: keyof Translations }[] = [
-  { value: 'code', labelKey: 'markdown.mode.code' },
-  { value: 'split', labelKey: 'markdown.mode.split' },
-  { value: 'preview', labelKey: 'markdown.mode.preview' },
-];
-
-const isViewMode = (value: string | null): value is MarkdownViewMode =>
-  value === 'code' || value === 'split' || value === 'preview';
-
-const loadViewMode = (): MarkdownViewMode => {
-  try {
-    const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-    if (isViewMode(stored)) {
-      return stored;
-    }
-  } catch {
-    // localStorage 不可用（如隐私模式）时忽略，走默认模式
-  }
-  return DEFAULT_VIEW_MODE;
-};
-
 // Markdown 文档编辑器：支持源码/分屏/预览三种视图模式，
-// 编辑区提供常用文字格式化工具栏，输入防抖后自动保存回对应文件
+// 编辑区上方悬浮格式工具岛与右上角视图模式岛，
+// 输入防抖后自动保存回对应文件
 export const MarkdownEditor = ({ path }: { path: string }) => {
   const { t } = useI18n();
   const [text, setText] = useState<string | null>(null);
@@ -131,7 +108,7 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
   const handleModeChange = (next: MarkdownViewMode) => {
     setMode(next);
     try {
-      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, next);
+      window.localStorage.setItem('markdown_editor_view_mode', next);
     } catch {
       // 忽略持久化失败，仅影响下次打开时的默认模式
     }
@@ -209,28 +186,39 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
 
   return (
     <div className={`markdown-editor markdown-editor--${mode}`}>
-      <div className="markdown-editor__topbar">
-        {showEditor && <MarkdownToolbar onAction={handleAction} disabled={text === null} />}
-        <div
-          className="markdown-editor__modes"
-          role="tablist"
-          aria-label={t('markdown.mode.label')}
-        >
-          {VIEW_MODES.map((viewMode) => (
-            <button
-              key={viewMode.value}
-              type="button"
-              role="tab"
-              aria-selected={mode === viewMode.value}
-              className={classNames('markdown-editor__mode-button', {
-                'markdown-editor__mode-button--active': mode === viewMode.value,
-              })}
-              onClick={() => handleModeChange(viewMode.value)}
-            >
-              {t(viewMode.labelKey)}
-            </button>
-          ))}
+      {/* 格式工具岛：悬浮在编辑区顶部居中，预览模式不渲染 */}
+      {showEditor && (
+        <div className="editor-island-wrap markdown-editor__island-wrap">
+          <MarkdownToolbar
+            onAction={handleAction}
+            disabled={text === null}
+            mode={mode}
+            onViewModeChange={handleModeChange}
+          />
         </div>
+      )}
+      {/* 视图模式岛：独立悬浮在编辑区右上角 */}
+      <div
+        className="markdown-editor__modes"
+        role="tablist"
+        aria-label={t('markdown.mode.label')}
+      >
+        {VIEW_MODES.map((viewMode) => (
+          <button
+            key={viewMode.value}
+            type="button"
+            role="tab"
+            aria-selected={mode === viewMode.value}
+            className={classNames('markdown-editor__mode-button', {
+              'markdown-editor__mode-button--active': mode === viewMode.value,
+            })}
+            // 阻止按钮夺焦，textarea 中的光标选区不丢失
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => handleModeChange(viewMode.value)}
+          >
+            {t(viewMode.labelKey)}
+          </button>
+        ))}
       </div>
       <div className="markdown-editor__body">
         {showEditor && (

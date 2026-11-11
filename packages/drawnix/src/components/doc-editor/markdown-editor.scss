@@ -1,114 +1,51 @@
 // Markdown 编辑器：源码/分屏/预览三种视图模式，
-// 顶栏为格式化工具栏 + 右侧视图模式分段按钮
+// 格式工具岛悬浮顶部居中，视图模式岛悬浮右上角。
+// 注：本文件规则不在 .drawnix 内嵌套，isMobile mixin 会展开成
+// 同元素类拼接（永不匹配），窄屏一律用 .drawnix--mobile 后代选择器
 .markdown-editor {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  // 作为两个工具岛的定位基准
+  position: relative;
 
-  &__topbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    background: var(--color-surface-mid);
-    border-bottom: 1px solid var(--dx-border-hairline);
-  }
+  // 格式岛定位壳：右侧让出视图岛宽度，保证两岛间距；
+  // 窄屏视图岛隐藏后改为左右贴边
+  &__island-wrap {
+    padding-right: 220px;
 
-  &__toolbar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  &__tool-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-md);
-    background: transparent;
-    color: var(--color-on-surface);
-    cursor: pointer;
-    transition: background-color var(--dx-duration-fast) var(--dx-ease),
-      color var(--dx-duration-fast) var(--dx-ease);
-
-    &:hover:not(:disabled) {
-      background: var(--color-surface-high);
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px var(--focus-highlight-color);
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
+    .drawnix--mobile & {
+      left: 12px;
+      right: 12px;
+      padding-right: 0;
     }
   }
 
-  &__tool-icon {
-    display: block;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  // 加粗/斜体/删除线/标题等文字字形按钮
-  &__glyph {
-    display: block;
-    font-size: var(--dx-font-sm);
-    line-height: 1;
-    font-weight: 500;
-
-    &--bold {
-      font-weight: 700;
-    }
-
-    &--italic {
-      font-style: italic;
-      font-family: Georgia, serif;
-    }
-
-    &--strike {
-      text-decoration: line-through;
-    }
-  }
-
-  &__separator {
-    width: 1px;
-    height: 18px;
-    margin: 0 3px;
-    background: var(--dx-border-strong);
-  }
-
-  // 视图模式分段按钮
+  // 视图模式岛：独立悬浮在编辑区右上角，窄屏收纳进「更多」菜单
   &__modes {
-    flex: 0 0 auto;
-    margin-left: auto;
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    z-index: 7;
     display: inline-flex;
     align-items: center;
-    padding: 3px;
+    padding: 4px;
     border: 1px solid var(--dx-border-hairline);
     border-radius: var(--dx-radius-full);
     background: var(--island-bg-color);
     box-shadow: var(--shadow-island);
+
+    .drawnix--mobile & {
+      display: none;
+    }
   }
 
   &__mode-button {
-    font-size: var(--dx-font-sm);
+    font-size: var(--dx-font-xs);
     line-height: 1;
-    height: 26px;
-    padding: 0 16px;
+    height: 28px;
+    padding: 0 15px;
     border: none;
     border-radius: var(--dx-radius-full);
     background: transparent;
@@ -120,6 +57,11 @@
 
     &:hover {
       color: var(--color-on-surface);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
     }
 
     &--active,
@@ -142,7 +84,8 @@
     resize: none;
     border: none;
     border-radius: 0;
-    padding: 16px 20px;
+    // 顶部留白让出工具岛高度，岛不遮正文
+    padding: 76px 20px 16px;
     font-family: ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace;
     font-size: 15px;
     line-height: 1.7;
@@ -164,12 +107,15 @@
     flex: 1 1 50%;
     min-width: 0;
     overflow: auto;
-    padding: 16px 20px;
+    // 顶部留白让出工具岛高度
+    padding: 76px 20px 16px;
     border-left: 1px solid var(--island-border-color, #e0e0e0);
   }
 
-  // 预览模式（非分屏）下预览区独占整行，去掉分栏边线
+  // 预览模式（非分屏）下无格式岛，预览区独占整行、
+  // 恢复常规顶部留白并去掉分栏边线
   &--preview &__preview {
+    padding-top: 16px;
     border-left: none;
   }
 }

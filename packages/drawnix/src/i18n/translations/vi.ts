@@ -193,6 +193,20 @@ const viTranslations: Translations = {
   'table.underline': 'Gạch chân',
   'table.strikethrough': 'Gạch ngang',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'Hàng & cột',
+  'table.toolbar.merge': 'Gộp',
+  'table.toolbar.align': 'Căn chỉnh',
+  'table.toolbar.more': 'Thêm',
+  'table.toolbar.help': 'Trợ giúp',
+  'table.help.title': 'Mẹo',
+  'table.disabled.row': 'Phải còn ít nhất một hàng',
+  'table.disabled.col': 'Phải còn ít nhất một cột',
+  'table.disabled.merge': 'Chọn nhiều ô để gộp chúng',
+  'table.disabled.unmerge': 'Không có ô đã gộp nào trong vùng chọn để bỏ gộp',
+  'table.selectionOne': 'Đã chọn {cell} · 1 ô',
+  'table.selectionMany': 'Đã chọn {count} ô',
+
   // Markdown editor
   'markdown.placeholder': 'Nhập Markdown tại đây…',
   'markdown.mode.label': 'Chế độ xem',
@@ -218,6 +232,14 @@ const viTranslations: Translations = {
   'markdown.tableTemplate': '| Tiêu đề 1 | Tiêu đề 2 | Tiêu đề 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'chữ liên kết',
   'markdown.imagePlaceholder': 'mô tả hình ảnh',
+
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'Chèn',
+  'markdown.toolbar.more': 'Thêm',
+  'markdown.toolbar.disabled': 'Khả dụng sau khi tệp được tải',
+  'markdown.help.title': 'Mẹo',
+  'markdown.help.indent': 'Nhấn Tab để thụt lề các dòng đã chọn, Shift+Tab để giảm thụt lề',
+  'markdown.help.list': 'Nhấn Enter ở đầu dòng danh sách hoặc trích dẫn để tiếp tục tiền tố của nó',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Xóa tệp',

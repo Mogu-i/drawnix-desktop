@@ -192,6 +192,20 @@ const zhTranslations: Translations = {
   'table.underline': '下划线',
   'table.strikethrough': '删除线',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': '行列',
+  'table.toolbar.merge': '合并',
+  'table.toolbar.align': '对齐',
+  'table.toolbar.more': '更多',
+  'table.toolbar.help': '帮助',
+  'table.help.title': '操作提示',
+  'table.disabled.row': '至少保留一行',
+  'table.disabled.col': '至少保留一列',
+  'table.disabled.merge': '选中多个单元格后才能合并',
+  'table.disabled.unmerge': '选区内没有可取消的合并单元格',
+  'table.selectionOne': '已选中 {cell} · 共 1 个单元格',
+  'table.selectionMany': '已选中 {count} 个单元格',
+
   // Markdown editor
   'markdown.placeholder': '在此输入 Markdown 内容…',
   'markdown.mode.label': '视图模式',
@@ -217,6 +231,14 @@ const zhTranslations: Translations = {
   'markdown.tableTemplate': '| 表头 1 | 表头 2 | 表头 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': '链接文字',
   'markdown.imagePlaceholder': '图片描述',
+
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': '插入',
+  'markdown.toolbar.more': '更多',
+  'markdown.toolbar.disabled': '文件加载完成后可用',
+  'markdown.help.title': '操作提示',
+  'markdown.help.indent': 'Tab 缩进所选行，Shift+Tab 减少缩进',
+  'markdown.help.list': '在列表或引用行首按回车，自动延续前缀',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': '删除文件',

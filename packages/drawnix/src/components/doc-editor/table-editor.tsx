@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
+import { flip, offset, shift, useFloating } from '@floating-ui/react';
 import {
   TableFileData,
   TableCellData,
@@ -9,8 +10,33 @@ import {
 } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import type { Translations } from '../../i18n/types';
+import { MoreIcon } from '../icons';
+import { Select } from '../select/select';
 import './table-editor.scss';
 import { useDocAutoSave } from './use-doc-auto-save';
+import {
+  AlignIcon,
+  EditorColorSwatches,
+  EditorIsland,
+  EditorIslandButton,
+  EditorIslandDropdown,
+  EditorIslandMenuItem,
+  EditorIslandMenuSeparator,
+  EditorIslandMenuTitle,
+  EditorIslandSeparator,
+  IslandBorderIcon,
+  IslandColMinusIcon,
+  IslandColPlusIcon,
+  IslandFillIcon,
+  IslandGridIcon,
+  IslandHelpIcon,
+  IslandMergeIcon,
+  IslandRowMinusIcon,
+  IslandRowPlusIcon,
+  IslandTextColorIcon,
+  IslandUnmergeIcon,
+  useDrawnixContainer,
+} from './editor-toolbar-island';
 import {
   DEFAULT_TABLE_COL_WIDTH,
   DEFAULT_TABLE_ROW_HEIGHT,
@@ -25,40 +51,6 @@ const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
 const MIN_COL_WIDTH = 40;
 
 const MIN_ROW_HEIGHT = 24;
-
-/** 对齐图标线段坐标（16x16 视图框），h 为水平三横线，v 为垂直三竖线 */
-const ALIGN_ICON_LINES: Record<string, [number, number][]> = {
-  'h-left': [
-    [2, 10],
-    [2, 14],
-    [2, 8],
-  ],
-  'h-center': [
-    [3, 13],
-    [5, 11],
-    [2, 14],
-  ],
-  'h-right': [
-    [6, 14],
-    [2, 14],
-    [8, 14],
-  ],
-  'v-top': [
-    [2, 10],
-    [2, 14],
-    [2, 8],
-  ],
-  'v-middle': [
-    [3, 13],
-    [5, 11],
-    [2, 14],
-  ],
-  'v-bottom': [
-    [6, 14],
-    [2, 14],
-    [8, 14],
-  ],
-};
 
 /** 字体效果的翻译键 */
 const EFFECT_LABEL_KEYS = {
@@ -78,28 +70,6 @@ const ALIGN_LABEL_KEYS: Record<AlignKind, keyof Translations> = {
 };
 
 type AlignKind = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
-
-const AlignIcon = ({ variant }: { variant: string }) => {
-  const vertical = variant.startsWith('v-');
-  const lines = ALIGN_ICON_LINES[variant] ?? [];
-  return (
-    <svg
-      className="table-editor__align-icon"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-    >
-      {lines.map(([a, b], i) =>
-        vertical ? (
-          <line key={i} x1={4 + i * 4} y1={a} x2={4 + i * 4} y2={b} />
-        ) : (
-          <line key={i} x1={a} y1={4 + i * 4} x2={b} y2={4 + i * 4} />
-        )
-      )}
-    </svg>
-  );
-};
 
 type CellPos = { row: number; col: number };
 
@@ -171,6 +141,17 @@ const hasMergeInRect = (data: TableFileData, rect: SelectionRect) => {
   return false;
 };
 
+/** 选区起始列转 Excel 风格列名（0 -> A），用于选区提示坐标 */
+const toColumnName = (index: number): string => {
+  let rest = index;
+  let name = '';
+  do {
+    name = String.fromCharCode(65 + (rest % 26)) + name;
+    rest = Math.floor(rest / 26) - 1;
+  } while (rest >= 0);
+  return name;
+};
+
 /**
  * 编辑态镜像占位文本：与展示态同样以不换行空格兜底空内容，
  * 并给末尾换行补一个不可见字符，保证该换行产生的空行也计入高度
@@ -182,6 +163,8 @@ const buildMirrorText = (draft: string) =>
 // 字号、文字颜色与单元格背景色，修改防抖后自动保存回对应文件
 export const TableEditor = ({ path }: { path: string }) => {
   const { t } = useI18n();
+  // 主题变量都定义在 .drawnix 根上，Select 浮层需 portal 进根内（G4）
+  const container = useDrawnixContainer();
   const [data, setData] = useState<TableFileData | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   // 选区：anchor 为起点，focus 为终点；拖动/Shift+点击扩展为矩形
@@ -191,6 +174,9 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 始终保持当前文字换行后的实际高度（与保存后的展示态一致）
   const [draft, setDraft] = useState('');
   const mouseDownRef = useRef(false);
+  // 拖选进行中标志：按住鼠标拖选单元格期间隐藏选区气泡（ref 变化不触发渲染，
+  // 气泡显隐依赖 state）；松开后气泡恢复浮出
+  const [dragSelecting, setDragSelecting] = useState(false);
   const dataRef = useRef<TableFileData | null>(null);
   // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
   const resizeRef = useRef<{
@@ -497,6 +483,7 @@ export const TableEditor = ({ path }: { path: string }) => {
       return;
     }
     mouseDownRef.current = true;
+    setDragSelecting(true);
     setSel({ anchor: { row, col }, focus: { row, col } });
   };
 
@@ -591,12 +578,66 @@ export const TableEditor = ({ path }: { path: string }) => {
   useEffect(() => {
     const stopSelecting = () => {
       mouseDownRef.current = false;
+      setDragSelecting(false);
     };
     window.addEventListener('mouseup', stopSelecting);
     return () => {
       window.removeEventListener('mouseup', stopSelecting);
     };
   }, []);
+
+  // ----- 选区覆盖层 -----
+  // WPS 式选区样式：对选中 td 的并集矩形（相对表格左上角）绘制最外一圈
+  // 连续边框 + 内部半透明颜色覆盖，替代逐格描边；与手柄测量同策略，
+  // 随数据/预览/选区变化与回流重测，对齐实际网格边界。
+  // 注意：必须声明在下方引用它的布局副作用与 ResizeObserver 之前，
+  // 否则依赖数组在渲染期触发暂时性死区引用错误
+  const [selectionBounds, setSelectionBounds] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const measureSelection = useCallback(() => {
+    const table = tableRef.current;
+    if (!table) {
+      return;
+    }
+    const base = table.getBoundingClientRect();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    table.querySelectorAll('td.table-editor__cell--selected').forEach((cell) => {
+      const box = cell.getBoundingClientRect();
+      left = Math.min(left, box.left - base.left);
+      top = Math.min(top, box.top - base.top);
+      right = Math.max(right, box.right - base.left);
+      bottom = Math.max(bottom, box.bottom - base.top);
+    });
+    // 无选中单元格时移除覆盖层
+    if (left === Infinity) {
+      setSelectionBounds(null);
+      return;
+    }
+    const next = { left, top, width: right - left, height: bottom - top };
+    // 矩形未变化时保持原引用，避免重测引发无谓重渲染（与手柄测量同一策略）
+    setSelectionBounds((prev) =>
+      prev &&
+      Math.abs(prev.left - next.left) < 0.5 &&
+      Math.abs(prev.top - next.top) < 0.5 &&
+      Math.abs(prev.width - next.width) < 0.5 &&
+      Math.abs(prev.height - next.height) < 0.5
+        ? prev
+        : next
+    );
+  }, []);
+
+  // 选区变化后同步重测；数据/预览尺寸与回流引发的变化由手柄测量的副作用与 ResizeObserver 一并覆盖
+  useLayoutEffect(() => {
+    measureSelection();
+  }, [rect, measureSelection]);
 
   // ----- 行高列宽调整 -----
 
@@ -711,10 +752,12 @@ export const TableEditor = ({ path }: { path: string }) => {
     });
   }, []);
 
-  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐
+  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐；
+  // 选区覆盖层随同一时机重测，跟随行高列宽变化
   useLayoutEffect(() => {
     measureBoundaries();
-  }, [data, resizePreview, measureBoundaries]);
+    measureSelection();
+  }, [data, resizePreview, measureBoundaries, measureSelection]);
 
   // 字体加载、窗口缩放等异步回流导致的行高变化由 ResizeObserver 兜底重新测量
   useEffect(() => {
@@ -722,12 +765,123 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!table || typeof ResizeObserver === 'undefined') {
       return;
     }
-    const observer = new ResizeObserver(() => measureBoundaries());
+    const observer = new ResizeObserver(() => {
+      measureBoundaries();
+      measureSelection();
+    });
     observer.observe(table);
     return () => {
       observer.disconnect();
     };
-  }, [data, measureBoundaries]);
+  }, [data, measureBoundaries, measureSelection]);
+
+  // ----- 选区气泡 -----
+  // 单元格是真实 DOM：用选中 td 的并集矩形构造虚拟 reference，
+  // 由 @floating-ui/react 就近定位（offset 10 + flip + shift）；
+  // 编辑态/拖拽调尺寸/按住拖选单元格时不浮出，避免遮挡输入框、拖拽手柄与拖选目标单元格
+  const [bubbleAnchor, setBubbleAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!rect || editing || resizing || dragSelecting) {
+      setBubbleAnchor(null);
+      return;
+    }
+    const measure = () => {
+      const table = tableRef.current;
+      if (!table) {
+        return;
+      }
+      const cells = table.querySelectorAll('td.table-editor__cell--selected');
+      if (cells.length === 0) {
+        setBubbleAnchor(null);
+        return;
+      }
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      cells.forEach((cell) => {
+        const box = cell.getBoundingClientRect();
+        left = Math.min(left, box.left);
+        top = Math.min(top, box.top);
+        right = Math.max(right, box.right);
+        bottom = Math.max(bottom, box.bottom);
+      });
+      const next = { x: left, y: top, width: right - left, height: bottom - top };
+      // 矩形未变化时保持原引用，避免滚动惯性期间频繁重渲染
+      setBubbleAnchor((prev) =>
+        prev &&
+        Math.abs(prev.x - next.x) < 0.5 &&
+        Math.abs(prev.y - next.y) < 0.5 &&
+        Math.abs(prev.width - next.width) < 0.5 &&
+        Math.abs(prev.height - next.height) < 0.5
+          ? prev
+          : next
+      );
+    };
+    measure();
+    // 虚拟 reference 不适用 autoUpdate：canvas 内滚动/窗口变化时手动重测
+    window.addEventListener('scroll', measure, true);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('scroll', measure, true);
+      window.removeEventListener('resize', measure);
+    };
+  }, [rect, editing, resizing, dragSelecting]);
+
+  const virtualReference = useMemo(() => {
+    if (!bubbleAnchor) {
+      return null;
+    }
+    const { x, y, width, height } = bubbleAnchor;
+    return {
+      getBoundingClientRect: () => ({
+        x,
+        y,
+        width,
+        height,
+        top: y,
+        left: x,
+        right: x + width,
+        bottom: y + height,
+        toJSON() {
+          return this;
+        },
+      }),
+    };
+  }, [bubbleAnchor]);
+
+  // strategy fixed：虚拟 reference 给出的是视口坐标（getBoundingClientRect）；
+  // 从选区右侧浮出：顶部被常驻工具岛占据、下方会盖住相邻单元格造成误触，
+  // 右侧空白区零遮挡（表格通常居左；空间不足时由 flip/shift 兜底）
+  const bubble = useFloating({
+    placement: 'right-start',
+    strategy: 'fixed',
+    middleware: [offset(10), flip(), shift({ padding: 8 })],
+  });
+  useEffect(() => {
+    if (virtualReference) {
+      bubble.refs.setReference(virtualReference);
+    }
+  }, [virtualReference, bubble.refs]);
+
+  // 选区短提示：从选区可靠推导才显示（单格显示坐标，多格显示数量）。
+  // 必须放在下方 early return 之前：hook 不能出现在条件 return 之后
+  const selectionNote = useMemo(() => {
+    if (!rect) {
+      return null;
+    }
+    const count = (rect.r2 - rect.r1 + 1) * (rect.c2 - rect.c1 + 1);
+    if (count === 1) {
+      return t('table.selectionOne').replace('{cell}', `${toColumnName(rect.c1)}${rect.r1 + 1}`);
+    }
+    return t('table.selectionMany').replace('{count}', String(count));
+  }, [rect, t]);
 
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
@@ -759,168 +913,352 @@ export const TableEditor = ({ path }: { path: string }) => {
   const firstCell = data.cells[rect?.r1 ?? 0]?.[rect?.c1 ?? 0];
   const currentAlign = firstCell?.align ?? 'left';
   const currentValign = firstCell?.valign ?? 'top';
+  const currentFontSize = firstCell?.fontSize ?? 14;
   const currentEffects = {
     bold: firstCell?.bold ?? false,
     underline: firstCell?.underline ?? false,
     strikethrough: firstCell?.strikethrough ?? false,
   };
 
+  const canUnmerge = !!rect && hasMergeInRect(data, rect);
+
+  // 编辑单格（选区即该格）时隐藏覆盖层：编辑框自带描边，避免两者叠加成双重粗环；
+  // 多格选区进入编辑时覆盖层保留，维持选区范围指示
+  const overlayHiddenByEditing =
+    !!editing && !!rect && rect.r1 === rect.r2 && rect.c1 === rect.c2;
+
   return (
     <div className="table-editor">
-      <div className="table-editor__toolbar">
-        <button type="button" className="table-editor__tool-button" onClick={handleInsertRow}>
-          {t('table.insertRow')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={data.rows <= 1}
-          onClick={handleDeleteRow}
-        >
-          {t('table.deleteRow')}
-        </button>
-        <button type="button" className="table-editor__tool-button" onClick={handleInsertCol}>
-          {t('table.insertCol')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={data.cols <= 1}
-          onClick={handleDeleteCol}
-        >
-          {t('table.deleteCol')}
-        </button>
-        <span className="table-editor__separator" />
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={!canMerge}
-          onClick={handleMerge}
-        >
-          {t('table.merge')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={!rect || !hasMergeInRect(data, rect)}
-          onClick={handleUnmerge}
-        >
-          {t('table.unmerge')}
-        </button>
-        <span className="table-editor__separator" />
-        <label className="table-editor__tool-item">
-          <span>{t('popupToolbar.stroke')}</span>
-          <select
-            value=""
-            onChange={(event) => {
-              const mode = event.target.value as BorderMode;
-              if (mode) {
-                applyBorder(mode);
+      <div className="editor-island-wrap table-editor__island-wrap">
+        <EditorIsland role="toolbar" aria-orientation="horizontal">
+          {/* 结构组：行列 / 合并，禁用条件与原按钮一致 */}
+          <EditorIslandDropdown label={t('table.toolbar.rows')} icon={<IslandGridIcon />}>
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  icon={<IslandRowPlusIcon />}
+                  onClick={() => {
+                    handleInsertRow();
+                    close();
+                  }}
+                >
+                  {t('table.insertRow')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandRowMinusIcon />}
+                  disabled={data.rows <= 1}
+                  disabledReason={t('table.disabled.row')}
+                  onClick={() => {
+                    handleDeleteRow();
+                    close();
+                  }}
+                >
+                  {t('table.deleteRow')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandColPlusIcon />}
+                  onClick={() => {
+                    handleInsertCol();
+                    close();
+                  }}
+                >
+                  {t('table.insertCol')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandColMinusIcon />}
+                  disabled={data.cols <= 1}
+                  disabledReason={t('table.disabled.col')}
+                  onClick={() => {
+                    handleDeleteCol();
+                    close();
+                  }}
+                >
+                  {t('table.deleteCol')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown label={t('table.toolbar.merge')} icon={<IslandMergeIcon />}>
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  icon={<IslandMergeIcon />}
+                  disabled={!canMerge}
+                  disabledReason={t('table.disabled.merge')}
+                  onClick={() => {
+                    handleMerge();
+                    close();
+                  }}
+                >
+                  {t('table.merge')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandUnmergeIcon />}
+                  disabled={!canUnmerge}
+                  disabledReason={t('table.disabled.unmerge')}
+                  onClick={() => {
+                    handleUnmerge();
+                    close();
+                  }}
+                >
+                  {t('table.unmerge')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandSeparator />
+          {/* 边框文字组 */}
+          <EditorIslandDropdown
+            className="editor-island__desktop-only"
+            label={t('table.border')}
+            icon={<IslandBorderIcon />}
+          >
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('all');
+                    close();
+                  }}
+                >
+                  {t('table.borderAll')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('none');
+                    close();
+                  }}
+                >
+                  {t('table.borderNone')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('outer');
+                    close();
+                  }}
+                >
+                  {t('table.borderOuter')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <Select.Root
+            size="2"
+            value={String(currentFontSize)}
+            onValueChange={(value) => applyStyle({ fontSize: Number(value) })}
+          >
+            <Select.Trigger
+              className="editor-island__select-trigger editor-island__desktop-only"
+              aria-label={t('popupToolbar.fontSize')}
+              onMouseDown={(event) => event.preventDefault()}
+            >
+              {currentFontSize}
+            </Select.Trigger>
+            <Select.Content container={container}>
+              {FONT_SIZES.map((size) => (
+                <Select.Item key={size} value={String(size)}>
+                  {size}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          {(
+            [
+              ['bold', 'B', 'bold'],
+              ['underline', 'U', 'underline'],
+              ['strikethrough', 'S', 'strike'],
+            ] as const
+          ).map(([effect, label, glyph]) => (
+            <EditorIslandButton
+              key={effect}
+              label={t(EFFECT_LABEL_KEYS[effect])}
+              active={currentEffects[effect]}
+              onClick={() =>
+                applyStyle({ [effect]: !currentEffects[effect] } as Partial<TableCellData>)
               }
-              event.target.value = '';
-            }}
+            >
+              <span className={`editor-island__glyph editor-island__glyph--${glyph}`}>{label}</span>
+            </EditorIslandButton>
+          ))}
+          <EditorIslandSeparator />
+          {/* 对齐颜色组：水平/垂直各三项，当前项带勾选 */}
+          <EditorIslandDropdown
+            className="editor-island__desktop-only"
+            label={t('table.toolbar.align')}
+            icon={<AlignIcon variant={`h-${currentAlign}`} />}
           >
-            <option value="" disabled>
-              {t('table.border')}
-            </option>
-            <option value="all">{t('table.borderAll')}</option>
-            <option value="none">{t('table.borderNone')}</option>
-            <option value="outer">{t('table.borderOuter')}</option>
-          </select>
-        </label>
-        <label className="table-editor__tool-item">
-          <span>{t('popupToolbar.fontSize')}</span>
-          <select
-            value=""
-            onChange={(event) => {
-              const size = Number(event.target.value);
-              applyStyle({ fontSize: size > 0 ? size : undefined });
-              event.target.value = '';
-            }}
-          >
-            <option value="" disabled>
-              {t('popupToolbar.fontSize')}
-            </option>
-            {FONT_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label
-          className="table-editor__tool-item table-editor__tool-item--color"
-          title={t('popupToolbar.fontColor')}
-        >
-          <span>{t('popupToolbar.fontColor')}</span>
-          <input
-            type="color"
-            defaultValue="#000000"
-            onChange={(event) => applyStyle({ color: event.target.value })}
-          />
-        </label>
-        <label
-          className="table-editor__tool-item table-editor__tool-item--color"
-          title={t('popupToolbar.fillColor')}
-        >
-          <span>{t('popupToolbar.fillColor')}</span>
-          <input
-            type="color"
-            defaultValue="#ffffff"
-            onChange={(event) => applyStyle({ bg: event.target.value })}
-          />
-        </label>
-        <span className="table-editor__separator" />
-        {(
-          [
-            ['bold', 'B'],
-            ['underline', 'U'],
-            ['strikethrough', 'S'],
-          ] as const
-        ).map(([effect, label]) => (
-          <button
-            key={effect}
-            type="button"
-            title={t(EFFECT_LABEL_KEYS[effect])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentEffects[effect],
-            })}
-            onClick={() =>
-              applyStyle({ [effect]: !currentEffects[effect] } as Partial<TableCellData>)
+            {(close) => (
+              <>
+                {(['left', 'center', 'right'] as const).map((align) => (
+                  <EditorIslandMenuItem
+                    key={align}
+                    icon={<AlignIcon variant={`h-${align}`} />}
+                    current={currentAlign === align}
+                    onClick={() => {
+                      applyStyle({ align });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[align])}
+                  </EditorIslandMenuItem>
+                ))}
+                <EditorIslandMenuSeparator />
+                {(['top', 'middle', 'bottom'] as const).map((valign) => (
+                  <EditorIslandMenuItem
+                    key={valign}
+                    icon={<AlignIcon variant={`v-${valign}`} />}
+                    current={currentValign === valign}
+                    onClick={() => {
+                      applyStyle({ valign });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[valign])}
+                  </EditorIslandMenuItem>
+                ))}
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown
+            label={t('popupToolbar.fontColor')}
+            icon={
+              <span className="editor-island__color-trigger">
+                <IslandTextColorIcon />
+                <span
+                  className="editor-island__color-chip"
+                  style={{ background: firstCell?.color ?? 'transparent' }}
+                />
+              </span>
             }
           >
-            <span className={`table-editor__effect-icon table-editor__effect-icon--${effect}`}>
-              {label}
-            </span>
-          </button>
-        ))}
-        {(['left', 'center', 'right'] as const).map((align) => (
-          <button
-            key={align}
-            type="button"
-            title={t(ALIGN_LABEL_KEYS[align])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentAlign === align,
-            })}
-            onClick={() => applyStyle({ align })}
+            {(close) => (
+              <EditorColorSwatches
+                value={firstCell?.color}
+                ariaLabel={t('popupToolbar.fontColor')}
+                onColorChange={(color) => {
+                  applyStyle({ color });
+                  close();
+                }}
+              />
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown
+            label={t('popupToolbar.fillColor')}
+            icon={
+              <span className="editor-island__color-trigger">
+                <IslandFillIcon />
+                <span
+                  className="editor-island__color-chip"
+                  style={{ background: firstCell?.bg ?? 'transparent' }}
+                />
+              </span>
+            }
           >
-            <AlignIcon variant={`h-${align}`} />
-          </button>
-        ))}
-        {(['top', 'middle', 'bottom'] as const).map((valign) => (
-          <button
-            key={valign}
-            type="button"
-            title={t(ALIGN_LABEL_KEYS[valign])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentValign === valign,
-            })}
-            onClick={() => applyStyle({ valign })}
+            {(close) => (
+              <EditorColorSwatches
+                value={firstCell?.bg}
+                ariaLabel={t('popupToolbar.fillColor')}
+                onColorChange={(color) => {
+                  applyStyle({ bg: color });
+                  close();
+                }}
+              />
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandSeparator />
+          {/* 帮助：正文沿用 table.selectionHint 全文，不改措辞 */}
+          <EditorIslandDropdown
+            label={t('table.toolbar.help')}
+            icon={<IslandHelpIcon />}
+            iconOnly
+            placement="bottom-end"
           >
-            <AlignIcon variant={`v-${valign}`} />
-          </button>
-        ))}
-        <span className="table-editor__hint">{t('table.selectionHint')}</span>
+            <div className="editor-island-help">
+              <div className="editor-island-help__title">{t('table.help.title')}</div>
+              <p>{t('table.selectionHint')}</p>
+            </div>
+          </EditorIslandDropdown>
+          {/* 更多（仅窄屏渲染）：收纳桌面端隐藏的低频组 */}
+          <EditorIslandDropdown
+            className="editor-island__mobile-only"
+            label={t('table.toolbar.more')}
+            icon={MoreIcon}
+            iconOnly
+            placement="bottom-end"
+          >
+            {(close) => (
+              <>
+                <EditorIslandMenuTitle>{t('table.border')}</EditorIslandMenuTitle>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('all');
+                    close();
+                  }}
+                >
+                  {t('table.borderAll')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('none');
+                    close();
+                  }}
+                >
+                  {t('table.borderNone')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('outer');
+                    close();
+                  }}
+                >
+                  {t('table.borderOuter')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuSeparator />
+                <EditorIslandMenuTitle>{t('table.toolbar.align')}</EditorIslandMenuTitle>
+                {(['left', 'center', 'right'] as const).map((align) => (
+                  <EditorIslandMenuItem
+                    key={`h-${align}`}
+                    icon={<AlignIcon variant={`h-${align}`} />}
+                    current={currentAlign === align}
+                    onClick={() => {
+                      applyStyle({ align });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[align])}
+                  </EditorIslandMenuItem>
+                ))}
+                {(['top', 'middle', 'bottom'] as const).map((valign) => (
+                  <EditorIslandMenuItem
+                    key={`v-${valign}`}
+                    icon={<AlignIcon variant={`v-${valign}`} />}
+                    current={currentValign === valign}
+                    onClick={() => {
+                      applyStyle({ valign });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[valign])}
+                  </EditorIslandMenuItem>
+                ))}
+                <EditorIslandMenuSeparator />
+                <EditorIslandMenuTitle>{t('popupToolbar.fontSize')}</EditorIslandMenuTitle>
+                {FONT_SIZES.map((size) => (
+                  <EditorIslandMenuItem
+                    key={size}
+                    current={currentFontSize === size}
+                    onClick={() => {
+                      applyStyle({ fontSize: size });
+                      close();
+                    }}
+                  >
+                    {size}
+                  </EditorIslandMenuItem>
+                ))}
+              </>
+            )}
+          </EditorIslandDropdown>
+        </EditorIsland>
       </div>
       <div className="table-editor__canvas">
         <div
@@ -1023,6 +1361,19 @@ export const TableEditor = ({ path }: { path: string }) => {
               ))}
             </tbody>
           </table>
+          {/* 选区覆盖层：WPS 式选区——选中区域最外一圈连续边框 + 内部半透明颜色覆盖；
+              pointer-events:none 不拦截单元格点击，编辑单格时隐藏避免与编辑框描边叠加 */}
+          {selectionBounds && !overlayHiddenByEditing && (
+            <div
+              className="table-editor__selection-overlay"
+              style={{
+                left: selectionBounds.left,
+                top: selectionBounds.top,
+                width: selectionBounds.width,
+                height: selectionBounds.height,
+              }}
+            />
+          )}
           {/* 列边界拖拽手柄：覆盖在每列右侧边界上，实时预览、松开提交 */}
           {colWidths.map((_, c) => (
             <div
@@ -1043,6 +1394,48 @@ export const TableEditor = ({ path }: { path: string }) => {
           ))}
         </div>
       </div>
+      {/* 选区气泡：fixed 定位跟随选中单元格并集矩形；直接渲染在编辑器内，
+          既能继承 .drawnix 变量，层级也天然低于页签栏/抽屉/弹窗 */}
+      {bubbleAnchor && (
+        <div
+          ref={bubble.refs.setFloating}
+          className="table-editor__bubble"
+          style={{ zIndex: 7, ...bubble.floatingStyles }}
+        >
+          <EditorIsland className="editor-island--bubble" role="toolbar">
+            <EditorIslandButton label={t('table.insertRow')} onClick={handleInsertRow}>
+              <IslandRowPlusIcon />
+            </EditorIslandButton>
+            <EditorIslandButton
+              label={t('table.deleteRow')}
+              disabled={data.rows <= 1}
+              disabledReason={t('table.disabled.row')}
+              onClick={handleDeleteRow}
+            >
+              <IslandRowMinusIcon />
+            </EditorIslandButton>
+            <EditorIslandSeparator />
+            <EditorIslandButton
+              label={t('table.merge')}
+              disabled={!canMerge}
+              disabledReason={t('table.disabled.merge')}
+              onClick={handleMerge}
+            >
+              <IslandMergeIcon />
+            </EditorIslandButton>
+            <EditorIslandButton
+              label={t('table.unmerge')}
+              disabled={!canUnmerge}
+              disabledReason={t('table.disabled.unmerge')}
+              onClick={handleUnmerge}
+            >
+              <IslandUnmergeIcon />
+            </EditorIslandButton>
+          </EditorIsland>
+          {/* 选区短提示随气泡出现，不与工具岛争位 */}
+          {selectionNote && <div className="table-editor__bubble-note">{selectionNote}</div>}
+        </div>
+      )}
     </div>
   );
 };

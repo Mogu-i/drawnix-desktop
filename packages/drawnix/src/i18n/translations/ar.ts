@@ -192,6 +192,20 @@ const arTranslations: Translations = {
   'table.underline': 'تسطير',
   'table.strikethrough': 'يتوسطه خط',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'صفوف وأعمدة',
+  'table.toolbar.merge': 'دمج',
+  'table.toolbar.align': 'محاذاة',
+  'table.toolbar.more': 'المزيد',
+  'table.toolbar.help': 'مساعدة',
+  'table.help.title': 'تلميحات',
+  'table.disabled.row': 'يجب أن يبقى صف واحد على الأقل',
+  'table.disabled.col': 'يجب أن يبقى عمود واحد على الأقل',
+  'table.disabled.merge': 'حدد خلايا متعددة لدمجها',
+  'table.disabled.unmerge': 'لا توجد خلايا مدمجة في التحديد لإلغاء دمجها',
+  'table.selectionOne': 'تم تحديد {cell} · خلية واحدة',
+  'table.selectionMany': 'تم تحديد {count} خلايا',
+
   // Markdown editor
   'markdown.placeholder': 'اكتب Markdown هنا…',
   'markdown.mode.label': 'وضع العرض',
@@ -217,6 +231,14 @@ const arTranslations: Translations = {
   'markdown.tableTemplate': '| العنوان 1 | العنوان 2 | العنوان 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'نص الرابط',
   'markdown.imagePlaceholder': 'وصف الصورة',
+
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'إدراج',
+  'markdown.toolbar.more': 'المزيد',
+  'markdown.toolbar.disabled': 'متاح بعد تحميل الملف',
+  'markdown.help.title': 'تلميحات',
+  'markdown.help.indent': 'اضغط Tab لزيادة المسافة البادئة للأسطر المحددة، و Shift+Tab لتقليلها',
+  'markdown.help.list': 'اضغط Enter في بداية سطر قائمة أو اقتباس لمواصلة بادئته',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'حذف الملف',
