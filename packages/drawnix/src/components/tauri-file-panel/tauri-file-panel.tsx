@@ -1254,13 +1254,17 @@ export const TauriFilePanel = () => {
           data-tauri-drag-region 标在容器与纯展示元素上（Tauri 仅认 mousedown 目标本身），
           按住品牌区空白 / logo / 文字均可拖动窗口，窗口三钮为子元素不受影响 */}
       <div className="tauri-file-panel__header" data-tauri-drag-region="">
-        <span
+        {/* 右上角品牌 logo：public/logo/logo.svg（自带圆角容器/磨砂/刷纹质感），
+            不再叠加渐变底；img 自带 drag-region 属性（mousedown 目标即 img）保持窗口可拖动，
+            draggable=false 防止原生图片拖拽抢先窗口拖动 */}
+        <img
           className="tauri-file-panel__brand-logo"
+          src="/logo/logo.svg"
+          alt=""
           aria-hidden="true"
+          draggable={false}
           data-tauri-drag-region=""
-        >
-          {BoardIcon}
-        </span>
+        />
         <span className="tauri-file-panel__brand-text" data-tauri-drag-region="">
           <span
             className="tauri-file-panel__brand-name"

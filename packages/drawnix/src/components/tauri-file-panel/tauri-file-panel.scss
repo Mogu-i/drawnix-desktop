@@ -73,19 +73,10 @@
       flex-shrink: 0;
       width: 30px;
       height: 30px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      display: block;
+      // 图形自带圆角容器与磨砂/刷纹质感，外层仅做尺寸约束；圆角兼作边缘裁切兑底
       border-radius: 9px;
-      background: var(--wb-brand-gradient);
-      color: #fff;
-
-      svg {
-        width: 16px;
-        height: 16px;
-        // mousedown 穿透到 logo span：data-tauri-drag-region 只认目标元素，svg 拦截会挡住拖动
-        pointer-events: none;
-      }
+      object-fit: contain;
     }
 
     .tauri-file-panel__brand-text {
