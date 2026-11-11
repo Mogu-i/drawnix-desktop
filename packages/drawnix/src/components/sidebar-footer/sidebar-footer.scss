@@ -5,8 +5,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
-    border-top: 1px solid var(--island-border-color);
+    // 面板 Island 的 padding 已收零，这里补回原视觉内边距（原 8px 面板留白 + 12px）
+    padding: 8px 20px;
+    border-top: 1px solid var(--dx-border-hairline);
 
     &__spacer {
       flex: 1;
@@ -20,13 +21,21 @@
       height: var(--lg-button-size, 32px);
       padding: 0;
       border: none;
-      border-radius: var(--border-radius-sm, 4px);
+      border-radius: var(--border-radius-md);
       background: transparent;
-      color: var(--color-on-surface);
+      color: var(--color-on-surface-muted);
       cursor: pointer;
+      transition: background-color var(--dx-duration-fast) var(--dx-ease),
+        color var(--dx-duration-fast) var(--dx-ease);
 
       &:hover {
-        background-color: var(--color-surface-primary-container);
+        background-color: var(--color-surface-high);
+        color: var(--color-on-surface);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
       }
 
       &.sidebar-footer__button--active {

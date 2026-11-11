@@ -36,9 +36,13 @@
   }
 
   .tool-icon__icon {
+    transition: background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease);
+
     &:hover {
-      background-color: var(--color-surface-primary-container);
-      color: var(--color-primary);
+      // 悬停用安静的中性底，不再一 hover 就闪主蓝
+      background-color: var(--color-surface-high);
+      color: var(--color-on-surface);
     }
 
     &:active {
@@ -59,6 +63,13 @@
       }
     }
   }
+
+  // button 型工具选中时，父层已铺蓝色选中底；
+  // 内层 hover 不再盖成中性灰，保留选中高亮
+  .tool-icon_type_button.tool-icon--selected .tool-icon__icon:hover:not([aria-disabled="true"]) {
+    background-color: var(--color-surface-primary-container);
+    color: var(--color-on-primary-container);
+  }
 }
 
 @mixin outlineButtonStyles {
@@ -77,6 +88,13 @@
   background-color: var(--button-bg, var(--island-bg-color));
   color: var(--icon-fill-color);
   font-family: var(--ui-font);
+  transition: background-color var(--dx-duration-fast) var(--dx-ease),
+    border-color var(--dx-duration-fast) var(--dx-ease);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-highlight-color);
+  }
 
   svg {
     width: var(--button-width, var(--lg-icon-size));
@@ -84,7 +102,7 @@
   }
 
   &:hover {
-    background-color: var(--button-hover-bg, var(--island-bg-color));
+    background-color: var(--button-hover-bg, var(--color-surface-high));
     border-color: var(
       --button-hover-border,
       var(--button-border, var(--default-border-color))
@@ -92,7 +110,7 @@
   }
 
   &:active {
-    background-color: var(--button-active-bg, var(--island-bg-color));
+    background-color: var(--button-active-bg, var(--color-surface-high));
     border-color: var(--button-active-border, var(--color-primary-darkest));
   }
 

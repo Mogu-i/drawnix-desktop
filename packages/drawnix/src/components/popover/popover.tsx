@@ -173,7 +173,9 @@ export const PopoverContent = React.forwardRef<
       >
         <div
           ref={ref}
-          style={{ ...context.floatingStyles, ...style }}
+          // 下拉/菜单浮层层级（G4）：盖住内容区（30）、侧栏（10/62）与页签栏（8），
+          // 与弹窗附属浮层同层、低于轻提示（80）
+          style={{ zIndex: 71, ...context.floatingStyles, ...style }}
           aria-labelledby={context.labelId}
           aria-describedby={context.descriptionId}
           {...context.getFloatingProps(props)}

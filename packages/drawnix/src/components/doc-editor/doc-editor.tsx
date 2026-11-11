@@ -1,13 +1,11 @@
-import { closeTauriDocEditor } from '../../data/tauri-file';
-import { useI18n } from '../../i18n';
 import { MarkdownEditor } from './markdown-editor';
 import { TableEditor } from './table-editor';
 import './doc-editor.scss';
 
-const lastSeg = (rel: string) => rel.slice(rel.lastIndexOf('/') + 1);
-
 // 文档编辑器覆盖层：Markdown/表格文件在主内容区的编辑入口，
-// 覆盖在白板之上，关闭后回到白板/欢迎页
+// .doc-editor 负责铺满主内容区并盖在白板之上，关闭后回到白板/欢迎页。
+// 文件名、类型与未保存状态由上方页签栏展示，关闭文档通过活动页签的关闭按钮完成，
+// 子组件卸载时会立即保存未落盘的修改
 export const DocEditor = ({
   path,
   fileType,
@@ -15,37 +13,9 @@ export const DocEditor = ({
   path: string;
   fileType: 'md' | 'table';
 }) => {
-  const { t } = useI18n();
-
-  const handleClose = () => {
-    // 子组件卸载时会立即保存未落盘的修改；
-    // 若是从白板（双击引用卡片）进入，则恢复之前的白板文件上下文
-    closeTauriDocEditor();
-  };
-
   return (
     <div className="doc-editor">
-      <div className="doc-editor__header">
-        <span className="doc-editor__badge">
-          {t(`filePanel.fileType.${fileType}`)}
-        </span>
-        <span className="doc-editor__filename" title={path}>
-          {lastSeg(path)}
-        </span>
-        <button
-          type="button"
-          className="doc-editor__close"
-          title={t('docEditor.close')}
-          onClick={handleClose}
-        >
-          ✕
-        </button>
-      </div>
-      {fileType === 'md' ? (
-        <MarkdownEditor path={path} />
-      ) : (
-        <TableEditor path={path} />
-      )}
+      {fileType === 'md' ? <MarkdownEditor path={path} /> : <TableEditor path={path} />}
     </div>
   );
 };

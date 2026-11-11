@@ -1,0 +1,117 @@
+// 退出确认弹窗：按 dirty 动态列出未保存文件（橙点 + 名称 + 类型标签）
+.exit-confirm {
+  background: var(--island-bg-color);
+  border: 1px solid var(--dx-border-hairline);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--dx-shadow-dialog);
+  padding: 24px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+
+  &__title {
+    font-size: var(--dx-font-lg);
+    font-weight: 600;
+    color: var(--color-on-surface);
+    margin: 0 0 8px;
+  }
+
+  &__description {
+    color: var(--color-on-surface-muted);
+    font-size: var(--dx-font-base);
+    line-height: 1.6;
+    margin: 0 0 12px;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 4px 0;
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 2px 8px;
+    border-radius: var(--wb-r-s);
+    font-size: var(--dx-font-base);
+
+    &:hover {
+      background: var(--wb-line-soft);
+    }
+  }
+
+  // 未保存橙点：与页签同款 7px 圆点
+  &__dot {
+    flex-shrink: 0;
+    width: var(--wb-dot-size);
+    height: var(--wb-dot-size);
+    border-radius: 50%;
+    background: var(--wb-warn);
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-on-surface);
+    font-weight: 500;
+  }
+
+  &__type {
+    flex-shrink: 0;
+    color: var(--color-on-surface-muted);
+    font-size: var(--dx-font-sm);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  &__button {
+    height: var(--control-height);
+    padding: 0 16px;
+    border-radius: var(--border-radius-md);
+    font-size: var(--dx-font-base);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition:
+      background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease),
+      border-color var(--dx-duration-fast) var(--dx-ease);
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--focus-highlight-color);
+    }
+
+    &--cancel {
+      background: var(--color-surface-secondary-container);
+      color: var(--color-on-surface);
+
+      &:hover {
+        background: var(--color-surface-high);
+      }
+    }
+
+    // 退出是中性动作（内容已尽力保存、不会丢失），用主色而非危险色
+    &--ok {
+      background: var(--wb-accent);
+      color: #fff;
+
+      &:hover {
+        background: var(--wb-accent-ink);
+      }
+    }
+  }
+}

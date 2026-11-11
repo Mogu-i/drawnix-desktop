@@ -1,58 +1,66 @@
 @use './variables.scss' as *;
 
+// ============================================================
+// Drawnix UI chrome 设计 token（浅色）
+// 三级表面深度：画布(sunken) / 内容区(surface) / 悬浮层(elevated)
+// 主蓝收敛为“当前选中 + 主动作”点缀，控件骨架走中性灰
+// ============================================================
 .drawnix {
-  --focus-highlight-color: #a5d8ff;
-  --icon-fill-color: var(--color-on-surface);
-  --island-bg-color: #ffffff;
-  --island-border-color: #eeeeee;
-  --keybinding-color: var(--color-gray-40);
-  --shadow-island: 0 0 16px #00000014;
-  --dialog-border-color: var(--color-gray-20);
-  --button-hover-bg: var(--color-surface-high);
-  --button-active-border: var(--color-brand-active);
-  --link-color: var(--color-primary);
-  --default-button-size: 2rem;
-  --default-icon-size: 1rem;
-  --lg-button-size: 2.25rem;
-  --lg-icon-size: 1.125rem;
-  --xlg-icon-size: 1.25rem;
-  --popup-label-size: 1.125rem;
-  --editor-container-padding: 1rem;
+  // ---- 字体族与字号阶梯 ----
+  --ui-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'PingFang SC', 'Noto Sans', 'Microsoft Yahei', Arial, sans-serif;
+  --dx-font-xs: 12px;
+  --dx-font-sm: 13px;
+  --dx-font-base: 14px;
+  --dx-font-md: 15px;
+  --dx-font-lg: 16px;
+  --dx-font-xl: 20px;
 
-  @media screen and (min-device-width: 1921px) {
-    --lg-button-size: 2.5rem;
-    --lg-icon-size: 1.25rem;
-    --default-button-size: 2.25rem;
-    --default-icon-size: 1.25rem;
-  }
+  // ---- 表面（暖中性纸感） ----
+  --island-bg-color: #ffffff; // 悬浮层：工具岛 / 面板 / 弹窗
+  --island-border-color: #edeff2; // 发丝级分隔
+  --color-surface-lowest: #ffffff;
+  --color-surface-low: #f1f0ec; // 画布底色（sunken，暖纸感）
+  --color-surface-mid: #f7f6f3; // 内容区底色（welcome / 空态）
+  --color-surface-high: #eef1f6; // 悬停背景
+  --color-surface-secondary-container: #f2f3f6; // 输入框 / 徽章 / 次级容器
+  --color-surface-primary-container: rgba(102, 152, 255, 0.1); // 选中态柔光底
 
-  --space-factor: 0.25rem;
-  --dx-space-1: 4px;
-  --dx-space-2: 8px;
-  --dx-space-3: 12px;
-  --dx-space-4: 16px;
-  --dx-space-5: 24px;
-  --dx-radius-1: 3px;
-  --dx-radius-2: 4px;
-  --dx-radius-3: 6px;
-  --dx-radius-4: 8px;
-  --dx-radius-full: 9999px;
+  // ---- 文字（建立真实对比与层级，修正“发灰”） ----
+  --color-on-surface: #33373d; // 主文字
+  --color-on-surface-muted: #6b7178; // 次级文字
+  --dx-text-tertiary: #9aa0a8; // 三级/说明
+  --dx-text-disabled: #c4c9d0; // 禁用
   --text-primary-color: var(--color-on-surface);
-
   --color-icon-white: #ffffff;
+  --color-on-primary-container: #4a7ee6; // 选中图标/文字（主蓝加深保对比）
 
+  // ---- 组件语义文字/背景别名（select 等复用，修正此前未定义） ----
+  --color-text-primary: var(--color-on-surface);
+  --color-text-secondary: var(--color-on-surface-muted);
+  --color-text-disabled: var(--dx-text-disabled);
+  --color-bg-disabled: var(--color-surface-secondary-container);
+
+  // ---- 边框 ----
+  --dx-border-hairline: #edeff2;
+  --dx-border-strong: #d9dce1;
+  --default-border-color: #e6e8ec;
+  --dialog-border-color: var(--dx-border-hairline);
+  --color-border-outline: #767680;
+  --color-border-outline-variant: #c5c5d0;
+
+  // ---- 主色（保留品牌蓝 #6698ff，收敛使用范围） ----
   --color-primary: #6698ff;
-  --color-primary-darker: #4a7ee6;    // 降低亮度和饱和度
-  --color-primary-darkest: #3366cc;   // 进一步降低亮度
-  --color-primary-light: #e6f0ff;     // 提高亮度，降低饱和度
-  --color-primary-light-darker: #cce0ff;  // light 的稍暗版本
-  --color-primary-hover: #80acff;     // 略微提高亮度的互动状态
+  --color-primary-darker: #4a7ee6;
+  --color-primary-darkest: #3366cc;
+  --color-primary-light: #e6f0ff;
+  --color-primary-light-darker: #cce0ff;
+  --color-primary-hover: #7aa7ff;
+  --color-on-primary: #ffffff; // 实心主按钮文字
+  --color-brand-hover: #6698ff;
+  --color-brand-active: #4a7ee6;
 
-  --button-hover-bg: var(--color-surface-high);
-  --button-active-bg: var(--color-surface-high);
-  --button-active-border: var(--color-brand-active);
-  --default-border-color: var(--color-surface-high);
-
+  // ---- 灰阶 ----
   --color-gray-10: #f5f5f5;
   --color-gray-20: #ebebeb;
   --color-gray-30: #d6d6d6;
@@ -65,26 +73,150 @@
   --color-gray-90: #1e1e1e;
   --color-gray-100: #121212;
 
-  --color-disabled: var(--color-gray-40);
-
+  // ---- 语义状态色 ----
+  --color-disabled: var(--dx-text-disabled);
   --color-promo: var(--color-primary);
-  --color-success: #268029;
-  --color-success-lighter: #cafccc;
+  --color-success: #2f855a;
+  --color-success-lighter: #d6f0e0;
+  --color-error: #d64545;
+  --color-error-lighter: #fbe3e3;
+  --link-color: var(--color-primary-darker);
+  --focus-highlight-color: rgba(102, 152, 255, 0.55);
 
-  --border-radius-sm: 0.25rem;
-  --border-radius-md: 0.375rem;
-  --border-radius-lg: 0.5rem;
-  --color-surface-high: hsl(220, 100%, 97%);
-  --color-surface-mid: hsl(220 25% 96%);
-  --color-surface-low: hsl(220 25% 94%);
-  --color-surface-lowest: #ffffff;
-  --color-on-surface: #666666;
-  --color-brand-hover: #6698ff;
-  --color-on-primary-container: #6698ff;
-  --color-surface-primary-container: rgba(102, 152, 255, .1);
-  --color-brand-active: #6698ff;
-  --color-border-outline: #767680;
-  --color-border-outline-variant: #c5c5d0;
+  // ---- 圆角档位 ----
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --dx-radius-1: 4px;
+  --dx-radius-2: 6px;
+  --dx-radius-3: 8px;
+  --dx-radius-4: 12px;
+  --dx-radius-full: 9999px;
 
-  --default-border-color: var(--color-surface-high);
+  // ---- 阴影（分层柔和，拉开表面高度） ----
+  --shadow-island: 0 1px 2px rgba(20, 25, 40, 0.05),
+    0 6px 20px rgba(20, 25, 40, 0.08);
+  --dx-shadow-popover: 0 4px 16px rgba(20, 25, 40, 0.1),
+    0 1px 3px rgba(20, 25, 40, 0.06);
+  --dx-shadow-dialog: 0 12px 40px rgba(20, 25, 40, 0.18),
+    0 2px 8px rgba(20, 25, 40, 0.08);
+
+  // ---- 间距节奏 ----
+  --space-factor: 0.25rem;
+  --dx-space-1: 4px;
+  --dx-space-2: 8px;
+  --dx-space-3: 12px;
+  --dx-space-4: 16px;
+  --dx-space-5: 24px;
+
+  // ---- 控件尺寸 ----
+  --default-button-size: 2rem;
+  --default-icon-size: 1rem;
+  --lg-button-size: 2.25rem;
+  --lg-icon-size: 1.125rem;
+  --xlg-icon-size: 1.25rem;
+  --popup-label-size: 1.125rem;
+  --editor-container-padding: 1rem;
+  --control-height: 32px; // 统一表单控件高度
+
+  // ---- 动效 ----
+  --dx-ease: cubic-bezier(0.2, 0, 0, 1);
+  --dx-duration-fast: 0.15s;
+  --dx-duration-base: 0.22s;
+
+  // ---- 按钮状态别名（供 mixin 复用） ----
+  --button-hover-bg: var(--color-surface-high);
+  --button-active-bg: var(--color-surface-high);
+  --button-active-border: var(--color-brand-active);
+  --button-selected-bg: var(--color-surface-primary-container);
+
+  --keybinding-color: var(--dx-text-tertiary);
+  --icon-fill-color: var(--color-on-surface);
+
+  // ---- 工作台 chrome（页签栏 / 右侧文件面板 / 窗口控件）----
+  // 独立 --wb-* 前缀，与画布 token 分离；值来自工作台视觉规格
+  --wb-bg: #f5f6fa;
+  --wb-surface: #ffffff;
+  --wb-stage: #ffffff;
+  --wb-line: #e5e8f0;
+  --wb-line-soft: #eff1f6;
+  --wb-text: #232937;
+  --wb-text-2: #59627a;
+  --wb-text-3: #6f788d;
+  --wb-disabled: #bfc6d4;
+  --wb-accent: #4c7df7;
+  --wb-accent-ink: #3567df;
+  --wb-accent-soft: #edf3ff;
+  --wb-accent-line: #d8e5ff;
+  --wb-warn: #e9a23b;
+  --wb-ok: #35a97a;
+  --wb-danger: #e34b4f;
+  --wb-danger-ink: #c4494c;
+  --wb-r-s: 8px;
+  --wb-r-m: 10px;
+  --wb-r-l: 14px;
+  --wb-shadow-pop: 0 10px 30px rgba(31, 45, 84, 0.1),
+    0 2px 6px rgba(31, 45, 84, 0.05);
+  --wb-font: 'PingFang SC', 'Microsoft YaHei', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  // 工作台常用尺寸（页签栏高度与面板品牌头共用，二者底边线对齐）
+  --wb-tabbar-h: 48px;
+  --wb-sidebar-w: 268px;
+  --wb-tab-h: 32px;
+  --wb-dot-size: 7px;
+  --wb-icon-btn: 32px;
+  --wb-btn-h: 36px;
+  --wb-split-h: 38px;
+
+  @media screen and (min-device-width: 1921px) {
+    --lg-button-size: 2.5rem;
+    --lg-icon-size: 1.25rem;
+    --default-button-size: 2.25rem;
+    --default-icon-size: 1.25rem;
+  }
+}
+
+// ============================================================
+// 暗色 chrome：集中覆盖，组件不再各自硬编码
+// ============================================================
+.drawnix.theme--dark {
+  --island-bg-color: #23262b;
+  --island-border-color: #33373d;
+  --color-surface-lowest: #1b1e22;
+  --color-surface-low: #1b1e22;
+  --color-surface-mid: #202328;
+  --color-surface-high: #2e3238;
+  --color-surface-secondary-container: #2b2f35;
+  --color-surface-primary-container: rgba(102, 152, 255, 0.18);
+  --color-on-surface: #e6e8ec;
+  --color-on-surface-muted: #a7adb6;
+  --dx-text-tertiary: #8f96a1;
+  --dx-text-disabled: #565b62;
+  --dx-border-hairline: #33373d;
+  --dx-border-strong: #43474e;
+  --default-border-color: #33373d;
+  --color-on-primary-container: #9dc0ff;
+  // 主色/状态色的“浅底”档在暗色下需压暗，避免浅底配浅字不可读
+  --color-primary-light: #2a3346;
+  --color-primary-light-darker: #2f3a52;
+  --color-error-lighter: #3b2426;
+  --color-success-lighter: #1f3a2b;
+  --shadow-island: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+  --dx-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --dx-shadow-dialog: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+  // 工作台 chrome 暗色映射：表面/文字沿用暗色阶梯，状态色不随主题翻转
+  --wb-bg: #171a1f;
+  --wb-surface: #23262b;
+  --wb-stage: #1b1e22;
+  --wb-line: #33373d;
+  --wb-line-soft: #2a2e34;
+  --wb-text: #e6e8ec;
+  --wb-text-2: #a7adb6;
+  --wb-text-3: #8f96a1;
+  --wb-disabled: #565b62;
+  --wb-accent-soft: #2a3346;
+  --wb-accent-line: #2f3a52;
+  --wb-shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.4);
 }

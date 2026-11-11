@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent } from '../dialog/dialog';
 import { Select } from '../select/select';
 import {
@@ -9,6 +9,7 @@ import {
   listTauriTree,
   normalizeTauriFileName,
 } from '../../data/tauri-file';
+import type { CreateDialogPreset } from '../../data/workbench-ui';
 import { useI18n } from '../../i18n';
 import './create-file-dialog.scss';
 
@@ -34,12 +35,14 @@ const clampTableSize = (value: number, fallback: number) => {
 };
 
 // 新建文件弹窗：选择文件类型（白板/Markdown/表格）、输入文件名并选择所在目录后
-// 确认创建，由侧边栏文件面板与欢迎页共用。
+// 确认创建，由侧边栏文件面板与欢迎页共用；
+// presetType 非空时预选类型并隐藏类型字段（拆分按钮菜单进入，C2/C8）。
 export const CreateFileDialog = ({
   open,
   onOpenChange,
   container,
   onCreate,
+  presetType = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,20 +53,35 @@ export const CreateFileDialog = ({
     fileType: TauriFileType,
     options: CreateTauriFileOptions
   ) => void;
+  /** 非空时预选文件类型并隐藏类型字段，标题随之变化 */
+  presetType?: CreateDialogPreset;
 }) => {
   const { t } = useI18n();
   const [fileName, setFileName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [dirs, setDirs] = useState<TauriTreeDirEntry[]>([]);
   const [dirPath, setDirPath] = useState('');
   const [fileType, setFileType] = useState<TauriFileType>('drawnix');
   const [tableRows, setTableRows] = useState(DEFAULT_TABLE_ROWS);
   const [tableCols, setTableCols] = useState(DEFAULT_TABLE_COLS);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  // 预选类型后不再二次选择，标题同步变化
+  const hasPreset = presetType !== null && presetType !== 'folder';
+  const titleKey = hasPreset
+    ? presetType === 'board'
+      ? 'workbench.panel.newBoard'
+      : presetType === 'table'
+        ? 'workbench.panel.newTable'
+        : 'workbench.panel.newMd'
+    : 'filePanel.newFile';
 
   useEffect(() => {
     if (open) {
       setFileName('');
+      setNameError(null);
       setDirPath('');
-      setFileType('drawnix');
+      // 预选类型的 board 对应白板引擎的 drawnix
+      setFileType(hasPreset ? (presetType === 'board' ? 'drawnix' : presetType) : 'drawnix');
       setTableRows(DEFAULT_TABLE_ROWS);
       setTableCols(DEFAULT_TABLE_COLS);
       if (isTauriEnvironment()) {
@@ -74,12 +92,40 @@ export const CreateFileDialog = ({
           });
       }
     }
-  }, [open]);
+  }, [open, presetType, hasPreset]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const name = normalizeTauriFileName(fileName);
     if (!name) {
+      // 空名：显示错误并保留输入与焦点（C8）
+      setNameError(t('workbench.create.nameEmpty'));
+      nameInputRef.current?.focus();
       return;
+    }
+    // 同名校验：同目录下文件与目录都不能重名（C8）
+    if (isTauriEnvironment()) {
+      try {
+        const tree = await listTauriTree();
+        const parent = dirPath || '';
+        const taken = new Set<string>();
+        tree.files.forEach((file) => {
+          if (parentOf(file.path) === parent) {
+            taken.add(lastSeg(file.path));
+          }
+        });
+        tree.dirs.forEach((entry) => {
+          if (parentOf(entry.path) === parent) {
+            taken.add(lastSeg(entry.path));
+          }
+        });
+        if (taken.has(name)) {
+          setNameError(t('workbench.create.nameDuplicate'));
+          nameInputRef.current?.focus();
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to check duplicate name:', error);
+      }
     }
     onCreate(name, dirPath || null, fileType, {
       rows: clampTableSize(tableRows, DEFAULT_TABLE_ROWS),
@@ -94,7 +140,7 @@ export const CreateFileDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="create-file-dialog" container={container}>
-        <h2 className="create-file-dialog__title">{t('filePanel.newFile')}</h2>
+        <h2 className="create-file-dialog__title">{t(titleKey)}</h2>
         {dirs.length > 0 && (
           <div className="create-file-dialog__group">
             <div className="create-file-dialog__group-label">
@@ -126,47 +172,62 @@ export const CreateFileDialog = ({
             </Select.Root>
           </div>
         )}
-        <div className="create-file-dialog__group">
-          <div className="create-file-dialog__group-label">
-            {t('filePanel.fileType')}
-          </div>
-          <Select.Root
-            value={fileType}
-            onValueChange={(value) => {
-              setFileType(value as TauriFileType);
-            }}
-          >
-            <Select.Trigger
-              className="create-file-dialog__select"
-              aria-label={t('filePanel.fileType')}
+        {!hasPreset && (
+          <div className="create-file-dialog__group">
+            <div className="create-file-dialog__group-label">
+              {t('filePanel.fileType')}
+            </div>
+            <Select.Root
+              value={fileType}
+              onValueChange={(value) => {
+                setFileType(value as TauriFileType);
+              }}
             >
-              {t(`filePanel.fileType.${fileType}`)}
-            </Select.Trigger>
-            <Select.Content container={container}>
-              {FILE_TYPE_OPTIONS.map((type) => (
-                <Select.Item key={type} value={type}>
-                  {t(`filePanel.fileType.${type}`)}
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Root>
-        </div>
+              <Select.Trigger
+                className="create-file-dialog__select"
+                aria-label={t('filePanel.fileType')}
+              >
+                {t(`filePanel.fileType.${fileType}`)}
+              </Select.Trigger>
+              <Select.Content container={container}>
+                {FILE_TYPE_OPTIONS.map((type) => (
+                  <Select.Item key={type} value={type}>
+                    {t(`filePanel.fileType.${type}`)}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </div>
+        )}
         <div className="create-file-dialog__group">
           <div className="create-file-dialog__group-label">{t('filePanel.fileName')}</div>
           <input
+            ref={nameInputRef}
             className="create-file-dialog__input"
             type="text"
             placeholder={t('filePanel.newFilePlaceholder')}
             value={fileName}
             autoFocus
+            aria-invalid={nameError ? true : undefined}
             onFocus={(event) => event.target.select()}
-            onChange={(event) => setFileName(event.target.value)}
+            onChange={(event) => {
+              setFileName(event.target.value);
+              if (nameError) {
+                setNameError(null);
+              }
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
-                handleCreate();
+                event.preventDefault();
+                void handleCreate();
               }
             }}
           />
+          {nameError && (
+            <div className="create-file-dialog__error" role="alert">
+              {nameError}
+            </div>
+          )}
         </div>
         {fileType === 'table' && (
           <div className="create-file-dialog__group create-file-dialog__group--table-size">
@@ -209,8 +270,7 @@ export const CreateFileDialog = ({
           <button
             type="button"
             className="create-file-dialog__button create-file-dialog__button--ok"
-            disabled={!normalizeTauriFileName(fileName)}
-            onClick={handleCreate}
+            onClick={() => void handleCreate()}
           >
             {t('cleanConfirm.ok')}
           </button>

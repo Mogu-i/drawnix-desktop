@@ -40,6 +40,8 @@ const viTranslations: Translations = {
   'zoom.100': 'Zoom 100%',
   'zoom.fullscreen': 'Toàn màn hình',
   'zoom.exitFullscreen': 'Thoát toàn màn hình',
+  'zoom.showToolbar': 'Hiện thanh công cụ',
+  'zoom.hideToolbar': 'Ẩn thanh công cụ',
 
   // Themes
   'theme.default': 'Mặc định',
@@ -70,6 +72,8 @@ const viTranslations: Translations = {
   // General
   'general.undo': 'Hoàn tác',
   'general.redo': 'Làm lại',
+  'editor.undo.disabled': 'Không có thay đổi để hoàn tác',
+  'editor.redo.disabled': 'Không có thay đổi để làm lại',
   'general.menu': 'Menu ứng dụng',
   'general.moreOptions': 'Tùy chọn khác',
   'general.duplicate': 'Nhân bản',
@@ -89,6 +93,8 @@ const viTranslations: Translations = {
   'toast.tauriFile.exportFailed': 'Xuất thất bại',
   'toast.tauriFile.deleteFailed': 'Xóa thất bại',
   'toast.tauriFile.restoreFailed': 'Khôi phục thất bại',
+  'toast.tauriFile.createFolderFailed':
+    'Không thể tạo thư mục, có thể đã tồn tại thư mục trùng tên',
   // Language
   'language.switcher': 'Ngôn ngữ',
   'language.chinese': '中文',
@@ -148,8 +154,8 @@ const viTranslations: Translations = {
   'filePanel.newFolder': 'Nhóm mới',
   'filePanel.newSubFolder': 'Nhóm con mới',
   'filePanel.newFolderPlaceholder': 'Tên nhóm…',
-  'filePanel.folderLocation': 'Nhóm',
-  'filePanel.defaultLocation': 'Thư mục gốc',
+  'filePanel.folderLocation': 'Thư mục',
+  'filePanel.defaultLocation': 'Cấp trên cùng',
   'filePanel.saveAs': 'Lưu thành',
   'filePanel.exportImage': 'Xuất ảnh',
   'filePanel.restore': 'Khôi phục',
@@ -189,6 +195,18 @@ const viTranslations: Translations = {
   'table.underline': 'Gạch chân',
   'table.strikethrough': 'Gạch ngang',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'Hàng & cột',
+  'table.toolbar.merge': 'Gộp',
+  'table.toolbar.align': 'Căn chỉnh',
+  'table.toolbar.more': 'Thêm',
+  'table.toolbar.help': 'Trợ giúp',
+  'table.help.title': 'Mẹo',
+  'table.disabled.row': 'Phải còn ít nhất một hàng',
+  'table.disabled.col': 'Phải còn ít nhất một cột',
+  'table.disabled.merge': 'Chọn nhiều ô để gộp chúng',
+  'table.disabled.unmerge': 'Không có ô đã gộp nào trong vùng chọn để bỏ gộp',
+
   // Markdown editor
   'markdown.placeholder': 'Nhập Markdown tại đây…',
   'markdown.mode.label': 'Chế độ xem',
@@ -215,8 +233,13 @@ const viTranslations: Translations = {
   'markdown.linkPlaceholder': 'chữ liên kết',
   'markdown.imagePlaceholder': 'mô tả hình ảnh',
 
-  // Doc editor overlay
-  'docEditor.close': 'Đóng',
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'Chèn',
+  'markdown.toolbar.more': 'Thêm',
+  'markdown.toolbar.disabled': 'Khả dụng sau khi tệp được tải',
+  'markdown.help.title': 'Mẹo',
+  'markdown.help.indent': 'Nhấn Tab để thụt lề các dòng đã chọn, Shift+Tab để giảm thụt lề',
+  'markdown.help.list': 'Nhấn Enter ở đầu dòng danh sách hoặc trích dẫn để tiếp tục tiền tố của nó',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Xóa tệp',
@@ -225,9 +248,9 @@ const viTranslations: Translations = {
   'deleteConfirm.ok': 'Xóa',
 
   // Delete folder confirm dialog
-  'folderDeleteConfirm.title': 'Xóa nhóm',
+  'folderDeleteConfirm.title': 'Xóa thư mục',
   'folderDeleteConfirm.description':
-    'Tất cả tệp trong nhóm sẽ được chuyển vào thùng rác và bị xóa vĩnh viễn sau thời gian lưu trữ. Tiếp tục?',
+    'Thư mục sẽ bị xóa, các tệp và thư mục con bên trong sẽ được chuyển lên cấp trên cùng. Tiếp tục?',
 
   // Move entry dialog
   'moveDialog.title': 'Chọn thư mục đích',
@@ -256,12 +279,53 @@ const viTranslations: Translations = {
   'login.button': 'Đăng nhập',
   'login.notAvailable': 'Tính năng đăng nhập chưa khả dụng',
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': '思画',
+  'workbench.brand.en': 'DRAWNIX',
+  'workbench.tab.more': 'Thao tác khác',
+  'workbench.tab.dirtySuffix': 'có thay đổi chưa lưu',
+  'workbench.tab.closeTab': 'Đóng thẻ',
+  'workbench.tab.collapsePanel': 'Thu gọn bảng tệp',
+  'workbench.tab.windowMenu': 'Cửa sổ',
+  'workbench.window.group': 'Cửa sổ',
+  'workbench.window.minimize': 'Thu nhỏ',
+  'workbench.window.maximize': 'Phóng to',
+  'workbench.window.restore': 'Khôi phục',
+  'workbench.window.close': 'Đóng',
+  'workbench.window.minimizeWindow': 'Thu nhỏ cửa sổ',
+  'workbench.window.maximizeWindow': 'Phóng to cửa sổ',
+  'workbench.window.restoreWindow': 'Khôi phục cửa sổ',
+  'workbench.window.closeWindow': 'Đóng cửa sổ',
+  'workbench.window.maximizedToast': 'Đã phóng to',
+  'workbench.window.restoredToast': 'Đã khôi phục về cửa sổ',
+  'workbench.window.recoveredToast': 'Đã khôi phục cửa sổ',
+  'workbench.panel.newBoard': 'Bảng vẽ mới',
+  'workbench.panel.newTable': 'Bảng mới',
+  'workbench.panel.newMd': 'Markdown mới',
+  'workbench.panel.newFolder': 'Thư mục mới',
+  'workbench.panel.newMore': 'Chọn nội dung cần tạo',
+  'workbench.panel.folderItems': '{count} mục',
+  'workbench.create.nameEmpty': 'Vui lòng nhập tên tệp',
+  'workbench.create.nameDuplicate': 'Đã có tệp trùng tên, vui lòng chọn tên khác.',
+  'workbench.create.folderLocation': 'Thư mục',
+  'workbench.save.success': 'Đã lưu «{name}» vào tệp cục bộ',
+  'workbench.save.noFile': 'Hãy mở một tệp trước',
+  'workbench.exit.title': 'Thoát',
+  'workbench.exit.dirtyDescription':
+    '{count} tệp vẫn còn thay đổi chưa lưu. Nội dung vẫn được giữ trên máy này, bạn có thể tiếp tục chỉnh sửa sau khi mở lại.',
+  'workbench.exit.cleanDescription': 'Tất cả tệp đã được lưu, bạn có thể mở lại và tiếp tục chỉnh sửa bất cứ lúc nào.',
+  'workbench.exit.cancel': 'Hủy',
+  'workbench.exit.confirm': 'Thoát',
+
   // Welcome page (Tauri desktop)
   'welcome.title': 'Chào mừng đến với Drawnix',
   'welcome.description':
     'Bảng trắng tất-cả-trong-một với sơ đồ tư duy, lưu đồ và vẽ tự do. Dữ liệu của bạn được lưu trong tệp cục bộ.',
   'welcome.newFile': 'Tệp mới',
   'welcome.sidebarHint': 'Hoặc mở tệp có sẵn từ danh sách bên trái',
+  'welcome.emptyTitle': 'Chưa mở tệp nào',
+  'welcome.emptyDescription':
+    'Tạo bảng vẽ, bảng hoặc Markdown, hoặc chọn một tệp từ thanh tab phía trên để tiếp tục chỉnh sửa.',
 
   // Link popup items
   'popupLink.delLink': 'Xóa liên kết',

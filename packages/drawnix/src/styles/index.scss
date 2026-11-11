@@ -7,11 +7,30 @@
     display: flex;
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei', 'Hiragino Sans GB', Arial, sans-serif;
-    .drawnix-main {
+    // 工作台骨架：内容列（页签栏 + 内容区）在左，文件面板在右（A1）
+    .wb-main {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+    }
+    .wb-content {
         position: relative;
         flex: 1 1 auto;
         min-width: 0;
         height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .drawnix-main {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        // 不设 height:100%：wb-content 是列 flex（页签栏 + 内容区），
+        // 固定 100% 会把页签栏高度叠到内容区上，底部溢出视口
+        // （右下角主题选择器被裁剪、原生下拉弹出窗外即此因）；
+        // 用 min-height:0 允许收缩到 flex 分配的剩余高度
+        min-height: 0;
     }
     .pencil-mode-toolbar {
         position: absolute;
@@ -51,11 +70,13 @@
             align-items: center;
             justify-content: center;
             color: var(--color-on-surface);
+            font-variant-numeric: tabular-nums;
             border-radius: var(--border-radius-sm);;
             cursor: pointer;
+            transition: background-color var(--dx-duration-fast) var(--dx-ease);
 
             &:hover, &.active {
-                --background: var(--color-surface-primary-container);
+                --background: var(--color-surface-high);
                 background-color: var(--background);
             }
         }
@@ -91,19 +112,13 @@
         @include isMobile {
             display: none;
         }
-        select {
-            width: 100px;
-            background-color: var(--color-surface-secondary-container);
-            color: var(--color-on-surface);
-            border-radius: var(--border-radius-sm);
-            padding: 4px 8px;
-            cursor: pointer;
-            border: none;
-            outline: none;
-            font-size: 14px;
-            &:hover {
-                background-color: var(--color-surface-primary-container);
-            }
+        // 原生 select 换为浮层 Select：触发按钮视觉对齐原 select
+        // （背景/边框/圆角/hover/focus 由 dx-SelectTrigger 自带），
+        // 下拉由 Floating UI 定位自动翻转，不再弹出窗外
+        .theme-toolbar__trigger {
+            width: 108px;
+            height: var(--control-height);
+            font-size: var(--dx-font-sm);
         }
     }
     .drawnix-link, a {
@@ -157,11 +172,12 @@
     }
 
     // 右侧内容展示区全屏（铺满窗口）模式：
-    // 内容区绝对定位铺满整个窗口，其余悬浮 UI（左侧文件面板、顶部/底部工具栏等）淡出隐藏；
-    // 缩放工具栏内仅保留全屏/退出按钮以便退出
+    // 内容区绝对定位铺满整个窗口，页签栏/文件面板/顶部与底部工具栏等淡出隐藏；
+    // 创作工具栏（文本/形状/导图/连线）保留，可随时演示标注，
+    // 通过缩放工具栏按钮或 Ctrl+\ 切换显隐；缩放工具栏内仅保留退出按钮
+    .tab-bar,
     .tauri-file-panel,
     .app-toolbar,
-    .draw-toolbar,
     .theme-toolbar,
     .pencil-mode-toolbar {
         transition: opacity 0.25s ease, visibility 0.25s ease;
@@ -172,21 +188,28 @@
     }
 
     &.drawnix--content-fullscreen {
-        position: relative;
-
         .drawnix-main {
-            position: absolute;
+            // fixed 相对视口铺满整个窗口：wb-content 是 relative 定位祖先，
+            // 若用 absolute 只会铺满内容列，右侧文件面板区域盖不到（露出透明背景）
+            position: fixed;
             inset: 0;
             z-index: 20;
             background-color: var(--island-bg-color);
             animation: drawnix-fullscreen-fade-in 0.25s ease;
         }
 
+        .tab-bar,
         .tauri-file-panel,
         .app-toolbar,
-        .draw-toolbar,
         .theme-toolbar,
         .pencil-mode-toolbar {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        // 全屏隐藏创作工具栏（切换按钮或 Ctrl+\ 触发），回到纯沉浸画面
+        &.drawnix--fullscreen-toolbar-hidden .draw-toolbar {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -197,6 +220,15 @@
             .zoom-in-button,
             .zoom-menu-trigger {
                 display: none;
+            }
+
+            // 仅保留的退出全屏按钮平时大幅弱化（低透明度），
+            // 悬停右上角时恢复完全不透明，兼顾沉浸感与可发现性
+            opacity: 0.3;
+            transition: opacity 0.2s ease;
+
+            &:hover {
+                opacity: 1;
             }
         }
     }

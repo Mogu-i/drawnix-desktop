@@ -39,6 +39,8 @@ const arTranslations: Translations = {
   'zoom.100': 'تكبير إلى 100%',
   'zoom.fullscreen': 'ملء الشاشة',
   'zoom.exitFullscreen': 'إنهاء ملء الشاشة',
+  'zoom.showToolbar': 'إظهار شريط الأدوات',
+  'zoom.hideToolbar': 'إخفاء شريط الأدوات',
 
   // Themes
   'theme.default': 'افتراضي',
@@ -69,6 +71,8 @@ const arTranslations: Translations = {
   // General
   'general.undo': 'تراجع',
   'general.redo': 'إعادة',
+  'editor.undo.disabled': 'لا توجد تغييرات للتراجع عنها',
+  'editor.redo.disabled': 'لا توجد تغييرات لإعادتها',
   'general.menu': 'قائمة التطبيق',
   'general.moreOptions': 'خيارات إضافية',
   'general.duplicate': 'تكرار',
@@ -95,6 +99,8 @@ const arTranslations: Translations = {
   'toast.tauriFile.exportFailed': 'فشل التصدير',
   'toast.tauriFile.deleteFailed': 'فشل الحذف',
   'toast.tauriFile.restoreFailed': 'فشل الاستعادة',
+  'toast.tauriFile.createFolderFailed':
+    'فشل إنشاء المجلد، قد يكون هناك مجلد بنفس الاسم موجودًا بالفعل',
 
   // Menu items
   'menu.open': 'فتح',
@@ -147,8 +153,8 @@ const arTranslations: Translations = {
   'filePanel.newFolder': 'مجموعة جديدة',
   'filePanel.newSubFolder': 'مجموعة فرعية جديدة',
   'filePanel.newFolderPlaceholder': 'اسم المجموعة…',
-  'filePanel.folderLocation': 'المجموعة',
-  'filePanel.defaultLocation': 'المجلد الرئيسي',
+  'filePanel.folderLocation': 'المجلد',
+  'filePanel.defaultLocation': 'المستوى الأعلى',
   'filePanel.saveAs': 'حفظ باسم',
   'filePanel.exportImage': 'تصدير صورة',
   'filePanel.restore': 'استعادة',
@@ -188,6 +194,18 @@ const arTranslations: Translations = {
   'table.underline': 'تسطير',
   'table.strikethrough': 'يتوسطه خط',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'صفوف وأعمدة',
+  'table.toolbar.merge': 'دمج',
+  'table.toolbar.align': 'محاذاة',
+  'table.toolbar.more': 'المزيد',
+  'table.toolbar.help': 'مساعدة',
+  'table.help.title': 'تلميحات',
+  'table.disabled.row': 'يجب أن يبقى صف واحد على الأقل',
+  'table.disabled.col': 'يجب أن يبقى عمود واحد على الأقل',
+  'table.disabled.merge': 'حدد خلايا متعددة لدمجها',
+  'table.disabled.unmerge': 'لا توجد خلايا مدمجة في التحديد لإلغاء دمجها',
+
   // Markdown editor
   'markdown.placeholder': 'اكتب Markdown هنا…',
   'markdown.mode.label': 'وضع العرض',
@@ -214,8 +232,13 @@ const arTranslations: Translations = {
   'markdown.linkPlaceholder': 'نص الرابط',
   'markdown.imagePlaceholder': 'وصف الصورة',
 
-  // Doc editor overlay
-  'docEditor.close': 'إغلاق',
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'إدراج',
+  'markdown.toolbar.more': 'المزيد',
+  'markdown.toolbar.disabled': 'متاح بعد تحميل الملف',
+  'markdown.help.title': 'تلميحات',
+  'markdown.help.indent': 'اضغط Tab لزيادة المسافة البادئة للأسطر المحددة، و Shift+Tab لتقليلها',
+  'markdown.help.list': 'اضغط Enter في بداية سطر قائمة أو اقتباس لمواصلة بادئته',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'حذف الملف',
@@ -224,9 +247,9 @@ const arTranslations: Translations = {
   'deleteConfirm.ok': 'حذف',
 
   // Delete folder confirm dialog
-  'folderDeleteConfirm.title': 'حذف المجموعة',
+  'folderDeleteConfirm.title': 'حذف المجلد',
   'folderDeleteConfirm.description':
-    'سيتم نقل جميع الملفات في المجموعة إلى المحذوفات وإزالتها نهائيًا بعد انتهاء مدة الحفظ. هل تريد المتابعة؟',
+    'سيتم حذف المجلد، وسيتم نقل الملفات والمجلدات الفرعية داخله إلى المستوى الأعلى. هل تريد المتابعة؟',
 
   // Move entry dialog
   'moveDialog.title': 'اختر المجلد الهدف',
@@ -255,12 +278,53 @@ const arTranslations: Translations = {
   'login.button': 'تسجيل الدخول',
   'login.notAvailable': 'تسجيل الدخول غير متاح بعد',
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': '思画',
+  'workbench.brand.en': 'DRAWNIX',
+  'workbench.tab.more': 'إجراءات أخرى',
+  'workbench.tab.dirtySuffix': 'تغييرات غير محفوظة',
+  'workbench.tab.closeTab': 'إغلاق اللسان',
+  'workbench.tab.collapsePanel': 'إخفاء لوحة الملفات',
+  'workbench.tab.windowMenu': 'النافذة',
+  'workbench.window.group': 'النافذة',
+  'workbench.window.minimize': 'تصغير',
+  'workbench.window.maximize': 'تكبير',
+  'workbench.window.restore': 'استعادة',
+  'workbench.window.close': 'إغلاق',
+  'workbench.window.minimizeWindow': 'تصغير النافذة',
+  'workbench.window.maximizeWindow': 'تكبير النافذة',
+  'workbench.window.restoreWindow': 'استعادة النافذة',
+  'workbench.window.closeWindow': 'إغلاق النافذة',
+  'workbench.window.maximizedToast': 'تم التكبير',
+  'workbench.window.restoredToast': 'تمت الاستعادة إلى نافذة',
+  'workbench.window.recoveredToast': 'تمت استعادة النافذة',
+  'workbench.panel.newBoard': 'سبورة جديدة',
+  'workbench.panel.newTable': 'جدول جديد',
+  'workbench.panel.newMd': 'Markdown جديد',
+  'workbench.panel.newFolder': 'مجلد جديد',
+  'workbench.panel.newMore': 'اختر ما تريد إنشاءه',
+  'workbench.panel.folderItems': '{count} عنصر',
+  'workbench.create.nameEmpty': 'الرجاء إدخال اسم الملف',
+  'workbench.create.nameDuplicate': 'يوجد ملف بهذا الاسم بالفعل، اختر اسمًا آخر.',
+  'workbench.create.folderLocation': 'المجلد',
+  'workbench.save.success': 'تم حفظ «{name}» في ملف محلي',
+  'workbench.save.noFile': 'افتح ملفًا أولًا',
+  'workbench.exit.title': 'الخروج',
+  'workbench.exit.dirtyDescription':
+    'لدي {count} ملفات تغييرات غير محفوظة. يبقى المحتوى على هذا الجهاز، ويمكنك مواصلة التحرير بعد إعادة الفتح.',
+  'workbench.exit.cleanDescription': 'جميع الملفات محفوظة، ويمكنك إعادة فتحها ومواصلة التحرير في أي وقت.',
+  'workbench.exit.cancel': 'إلغاء',
+  'workbench.exit.confirm': 'خروج',
+
   // Welcome page (Tauri desktop)
   'welcome.title': 'مرحبًا بك في Drawnix',
   'welcome.description':
     'سبورة شاملة تتضمن الخرائط الذهنية والمخططات الانسيابية والرسم الحر، وتُحفظ بياناتك في ملفات محلية.',
   'welcome.newFile': 'ملف جديد',
   'welcome.sidebarHint': 'أو افتح ملفًا موجودًا من القائمة الجانبية',
+  'welcome.emptyTitle': 'لا يوجد ملف مفتوح',
+  'welcome.emptyDescription':
+    'أنشئ سبورة أو جدولًا أو Markdown، أو اختر ملفًا من شريط التبويبات أعلاه لمواصلة التحرير.',
 
   // Link popup items
   'popupLink.delLink': 'حذف الرابط',

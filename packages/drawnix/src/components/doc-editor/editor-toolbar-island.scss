@@ -1,0 +1,391 @@
+// ============================================================
+// 文档编辑器工具岛：Markdown 与表格编辑器共用的悬浮工具壳
+// 白岛 + 发丝边 + 阴影表达层级，全部取值走 theme.scss 变量，
+// 规则嵌套在 .drawnix 内与 island.scss 保持同一作用域约定
+// ============================================================
+@use '../../styles/variables.scss' as *;
+
+.drawnix {
+  // 定位壳：绝对定位于编辑区顶部水平居中；壳本身不拦截点击，
+  // 岛本体恢复 pointer-events，点击岛外区域直接落到编辑区
+  .editor-island-wrap {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    z-index: 7;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+
+  // 岛本体：Island 已提供白底/发丝边/12px 圆角/--shadow-island
+  .editor-island {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+
+    @include isMobile {
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+      // 右缘渐隐提示还有更多动作（浮层 portal 到 .drawnix，不受 mask 影响）
+      mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+  }
+
+  // ---- 按钮：六态（默认/悬停/选中/焦点/禁用/展开） ----
+  .editor-island__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex: none;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border: none;
+    border-radius: var(--border-radius-md);
+    background: transparent;
+    color: var(--color-on-surface);
+    font-family: inherit;
+    font-size: var(--dx-font-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease);
+
+    // 16px 线性图标统一规则
+    svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-high);
+    }
+
+    // 选中/生效与展开态同底；后置书写保证悬停不盖掉高亮
+    &--active,
+    &--active:hover:not(:disabled),
+    &[data-state='open']:not(:disabled),
+    &[data-state='open']:hover:not(:disabled) {
+      background: var(--color-surface-primary-container);
+      color: var(--color-on-primary-container);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      color: var(--dx-text-disabled);
+    }
+
+    // 下拉触发变体：文字 + 12px chevron
+    &--drop {
+      gap: 5px;
+      padding: 0 8px;
+      font-size: var(--dx-font-xs);
+      font-weight: 500;
+    }
+  }
+
+  .editor-island__chev {
+    display: flex;
+    opacity: 0.7;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  // 加粗/斜体/删除线/下划线/标题等文字字形
+  .editor-island__glyph {
+    display: block;
+    font-size: var(--dx-font-sm);
+    line-height: 1;
+    font-weight: 500;
+
+    &--bold {
+      font-weight: 700;
+    }
+
+    &--italic {
+      font-style: italic;
+      font-family: Georgia, serif;
+    }
+
+    &--strike {
+      text-decoration: line-through;
+    }
+
+    &--underline {
+      text-decoration: underline;
+    }
+  }
+
+  // 组间分隔线：1px + 5px 外距
+  .editor-island__sep {
+    flex: none;
+    width: 1px;
+    height: 18px;
+    margin: 0 5px;
+    background: var(--dx-border-strong);
+  }
+
+  // 当前颜色小色块（色板下拉触发器内）
+  .editor-island__color-chip {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--dx-border-strong);
+    border-radius: var(--dx-radius-1);
+  }
+
+  // 色板触发器的图标 + 当前色块组合
+  .editor-island__color-trigger {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  // 表格字号下拉触发：岛内 ghost 形态（覆盖 dx-SelectTrigger 自带边框）
+  .editor-island__select-trigger {
+    height: 32px;
+    padding: 0 8px;
+    gap: 5px;
+    font-size: var(--dx-font-xs);
+    font-weight: 500;
+    background: transparent;
+    border-color: transparent;
+    border-radius: var(--border-radius-md);
+
+    &:hover {
+      background: var(--color-surface-high);
+      border-color: transparent;
+    }
+
+    &[data-state='open'] {
+      background: var(--color-surface-primary-container);
+      color: var(--color-on-primary-container);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    &:focus-visible {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
+    }
+  }
+
+  // ---- 浮层（下拉菜单 / 色板 / 帮助） ----
+  // 定位 transform 由 floating-ui 内联提供，出现动画放在内层包装，
+  // 避免动画 transform 覆盖定位 transform
+  .editor-island-pop__inner {
+    background: var(--island-bg-color);
+    border: 1px solid var(--island-border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--dx-shadow-popover);
+    padding: 6px;
+    min-width: 202px;
+    animation: editor-island-pop-in var(--dx-duration-fast) var(--dx-ease);
+  }
+
+  .editor-island-pop__title {
+    padding: 5px 9px 4px;
+    font-size: var(--dx-font-xs);
+    color: var(--dx-text-tertiary);
+  }
+
+  .editor-island-pop__item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 30px;
+    padding: 0 9px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-on-surface);
+    font-family: inherit;
+    font-size: var(--dx-font-xs);
+    cursor: pointer;
+    transition: background-color var(--dx-duration-fast) var(--dx-ease),
+      color var(--dx-duration-fast) var(--dx-ease);
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-high);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      color: var(--dx-text-disabled);
+    }
+  }
+
+  .editor-island-pop__item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 16px;
+
+    svg {
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
+  .editor-island-pop__item-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .editor-island-pop__item-check {
+    display: flex;
+    flex: none;
+    color: var(--color-on-primary-container);
+
+    svg {
+      display: block;
+    }
+  }
+
+  .editor-island-pop__sep {
+    height: 1px;
+    margin: 5px 4px;
+    background: var(--dx-border-hairline);
+  }
+
+  // ---- 色板 ----
+  .editor-island-pop__swatches {
+    display: grid;
+    grid-template-columns: repeat(7, 20px);
+    gap: 7px;
+    padding: 7px 9px 9px;
+  }
+
+  .editor-island-pop__swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--dx-border-strong);
+    border-radius: var(--dx-radius-2);
+    cursor: pointer;
+
+    &:hover {
+      box-shadow: 0 0 0 2px var(--color-surface-high);
+    }
+
+    &--picked {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 1px;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-highlight-color);
+    }
+  }
+
+  // ---- 帮助浮层 ----
+  .editor-island-help {
+    width: 246px;
+    padding: 12px 14px;
+    font-size: var(--dx-font-xs);
+    line-height: 1.8;
+    color: var(--color-on-surface-muted);
+
+    .editor-island-help__title {
+      margin-bottom: 4px;
+      color: var(--color-on-surface);
+      font-size: var(--dx-font-sm);
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+
+  // ---- 窄屏分组收纳：桌面/窄屏互斥显隐 ----
+  // 岛内控件（下拉触发等）用 -only；浮层内整段内容用 -block
+  .editor-island__desktop-only {
+    @include isMobile {
+      display: none;
+    }
+  }
+
+  .editor-island__mobile-only {
+    display: none;
+
+    @include isMobile {
+      display: flex;
+    }
+  }
+
+  .editor-island__desktop-block {
+    @include isMobile {
+      display: none;
+    }
+  }
+
+  .editor-island__mobile-block {
+    display: none;
+
+    @include isMobile {
+      display: block;
+    }
+  }
+}
+
+@keyframes editor-island-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawnix .editor-island-pop__inner {
+    animation: none;
+  }
+}

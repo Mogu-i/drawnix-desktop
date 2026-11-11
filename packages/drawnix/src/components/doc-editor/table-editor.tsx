@@ -4,13 +4,42 @@ import {
   TableFileData,
   TableCellData,
   buildEmptyTableCell,
+  getTauriDocDraft,
   parseTableFileContent,
   readTauriFile,
 } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import type { Translations } from '../../i18n/types';
+import { MoreIcon } from '../icons';
+import { Select } from '../select/select';
 import './table-editor.scss';
 import { useDocAutoSave } from './use-doc-auto-save';
+import { useDocHistory } from './use-doc-history';
+import {
+  AlignIcon,
+  EditorColorSwatches,
+  EditorIsland,
+  EditorIslandButton,
+  EditorIslandDropdown,
+  EditorIslandMenuItem,
+  EditorIslandMenuSeparator,
+  EditorIslandMenuTitle,
+  EditorIslandSeparator,
+  IslandBorderIcon,
+  IslandColMinusIcon,
+  IslandColPlusIcon,
+  IslandFillIcon,
+  IslandGridIcon,
+  IslandHelpIcon,
+  IslandMergeIcon,
+  IslandRedoIcon,
+  IslandRowMinusIcon,
+  IslandRowPlusIcon,
+  IslandTextColorIcon,
+  IslandUndoIcon,
+  IslandUnmergeIcon,
+  useDrawnixContainer,
+} from './editor-toolbar-island';
 import {
   DEFAULT_TABLE_COL_WIDTH,
   DEFAULT_TABLE_ROW_HEIGHT,
@@ -25,40 +54,6 @@ const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
 const MIN_COL_WIDTH = 40;
 
 const MIN_ROW_HEIGHT = 24;
-
-/** 对齐图标线段坐标（16x16 视图框），h 为水平三横线，v 为垂直三竖线 */
-const ALIGN_ICON_LINES: Record<string, [number, number][]> = {
-  'h-left': [
-    [2, 10],
-    [2, 14],
-    [2, 8],
-  ],
-  'h-center': [
-    [3, 13],
-    [5, 11],
-    [2, 14],
-  ],
-  'h-right': [
-    [6, 14],
-    [2, 14],
-    [8, 14],
-  ],
-  'v-top': [
-    [2, 10],
-    [2, 14],
-    [2, 8],
-  ],
-  'v-middle': [
-    [3, 13],
-    [5, 11],
-    [2, 14],
-  ],
-  'v-bottom': [
-    [6, 14],
-    [2, 14],
-    [8, 14],
-  ],
-};
 
 /** 字体效果的翻译键 */
 const EFFECT_LABEL_KEYS = {
@@ -78,28 +73,6 @@ const ALIGN_LABEL_KEYS: Record<AlignKind, keyof Translations> = {
 };
 
 type AlignKind = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
-
-const AlignIcon = ({ variant }: { variant: string }) => {
-  const vertical = variant.startsWith('v-');
-  const lines = ALIGN_ICON_LINES[variant] ?? [];
-  return (
-    <svg
-      className="table-editor__align-icon"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-    >
-      {lines.map(([a, b], i) =>
-        vertical ? (
-          <line key={i} x1={4 + i * 4} y1={a} x2={4 + i * 4} y2={b} />
-        ) : (
-          <line key={i} x1={a} y1={4 + i * 4} x2={b} y2={4 + i * 4} />
-        )
-      )}
-    </svg>
-  );
-};
 
 type CellPos = { row: number; col: number };
 
@@ -182,6 +155,8 @@ const buildMirrorText = (draft: string) =>
 // 字号、文字颜色与单元格背景色，修改防抖后自动保存回对应文件
 export const TableEditor = ({ path }: { path: string }) => {
   const { t } = useI18n();
+  // 主题变量都定义在 .drawnix 根上，Select 浮层需 portal 进根内（G4）
+  const container = useDrawnixContainer();
   const [data, setData] = useState<TableFileData | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   // 选区：anchor 为起点，focus 为终点；拖动/Shift+点击扩展为矩形
@@ -191,6 +166,9 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 始终保持当前文字换行后的实际高度（与保存后的展示态一致）
   const [draft, setDraft] = useState('');
   const mouseDownRef = useRef(false);
+  // 编辑态撤销/重做时主动移焦会触发 blur，此标记让该次 blur 跳过提交，
+  // 否则未提交的输入会被写回数据并覆盖恢复结果
+  const suppressBlurRef = useRef(false);
   const dataRef = useRef<TableFileData | null>(null);
   // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
   const resizeRef = useRef<{
@@ -226,7 +204,11 @@ export const TableEditor = ({ path }: { path: string }) => {
     dataRef.current = null;
     setSel(null);
     setEditing(null);
-    readTauriFile(path, 'table')
+    // 未保存草稿优先：切换页签/异常重启后重新挂载时磁盘仍是旧内容，
+    // 有草稿说明存在未保存修改，直接以草稿恢复（与保存入口写盘的内容同源），
+    // 与白板切页签时的快照恢复机制对称
+    const draft = getTauriDocDraft(path, 'table');
+    (draft !== null ? Promise.resolve(draft) : readTauriFile(path, 'table'))
       .then((content) => {
         if (cancelled) {
           return;
@@ -247,13 +229,68 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [path, markLoaded]);
 
+  const history = useDocHistory<TableFileData>();
+
+  // 撤销/重做恢复用裸应用：不走 commit（否则恢复动作又进历史）；
+  // 恢复后清空选区并退出编辑，避免选区引用到已失效的行列
+  const applyData = useCallback(
+    (snapshot: TableFileData) => {
+      dataRef.current = snapshot;
+      setData(snapshot);
+      setSel(null);
+      setEditing(null);
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (dataRef.current) {
+      history.undo(dataRef.current, applyData);
+    }
+  }, [history, applyData]);
+
+  const handleRedo = useCallback(() => {
+    if (dataRef.current) {
+      history.redo(dataRef.current, applyData);
+    }
+  }, [history, applyData]);
+
+  /** 撤销/重做快捷键：返回 true 表示已处理（已 preventDefault） */
+  const tryUndoRedoKey = (event: React.KeyboardEvent): boolean => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+      return false;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        handleRedo();
+      } else {
+        handleUndo();
+      }
+      return true;
+    }
+    if (key === 'y' && !event.shiftKey) {
+      event.preventDefault();
+      handleRedo();
+      return true;
+    }
+    return false;
+  };
+
   const commit = useCallback(
     (next: TableFileData) => {
+      // 修改前保存旧数据快照：结构化拷贝防止旧值被后续变更牵连；
+      // 所有结构/样式/单元格文本修改都汇入 commit，在此一处挂钩全覆盖
+      if (dataRef.current) {
+        history.pushHistory(structuredClone(dataRef.current));
+      }
       dataRef.current = next;
       setData(next);
       scheduleSave();
     },
-    [scheduleSave]
+    [scheduleSave, history]
   );
 
   const rect = useMemo<SelectionRect | null>(() => {
@@ -548,7 +585,12 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 选中态键盘处理：Enter 进入编辑，Tab/方向键切换单元格；
   // 编辑态按键由单元格内的 textarea 自行处理（此处冒泡时已在编辑中，直接忽略）
   const handleTableKeyDown = (event: React.KeyboardEvent) => {
-    if (editing || !sel || event.ctrlKey || event.altKey || event.metaKey) {
+    // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（非编辑态）：允许无选区时使用，
+    // 须放在选区/修饰键检查之前；编辑态的撤销由单元格 textarea 自行处理
+    if (!editing && data && tryUndoRedoKey(event)) {
+      return;
+    }
+    if (editing || !data || !sel || event.ctrlKey || event.altKey || event.metaKey) {
       return;
     }
     switch (event.key) {
@@ -588,6 +630,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     setSel({ anchor: sel.anchor, focus: { row, col } });
   };
 
+  // 拖选结束（window mouseup）复位拖选标志，单元格 mouseenter 依赖它扩展选区
   useEffect(() => {
     const stopSelecting = () => {
       mouseDownRef.current = false;
@@ -597,6 +640,59 @@ export const TableEditor = ({ path }: { path: string }) => {
       window.removeEventListener('mouseup', stopSelecting);
     };
   }, []);
+
+  // ----- 选区覆盖层 -----
+  // WPS 式选区样式：对选中 td 的并集矩形（相对表格左上角）绘制最外一圈
+  // 连续边框 + 内部半透明颜色覆盖，替代逐格描边；与手柄测量同策略，
+  // 随数据/预览/选区变化与回流重测，对齐实际网格边界。
+  // 注意：必须声明在下方引用它的布局副作用与 ResizeObserver 之前，
+  // 否则依赖数组在渲染期触发暂时性死区引用错误
+  const [selectionBounds, setSelectionBounds] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const measureSelection = useCallback(() => {
+    const table = tableRef.current;
+    if (!table) {
+      return;
+    }
+    const base = table.getBoundingClientRect();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    table.querySelectorAll('td.table-editor__cell--selected').forEach((cell) => {
+      const box = cell.getBoundingClientRect();
+      left = Math.min(left, box.left - base.left);
+      top = Math.min(top, box.top - base.top);
+      right = Math.max(right, box.right - base.left);
+      bottom = Math.max(bottom, box.bottom - base.top);
+    });
+    // 无选中单元格时移除覆盖层
+    if (left === Infinity) {
+      setSelectionBounds(null);
+      return;
+    }
+    const next = { left, top, width: right - left, height: bottom - top };
+    // 矩形未变化时保持原引用，避免重测引发无谓重渲染（与手柄测量同一策略）
+    setSelectionBounds((prev) =>
+      prev &&
+      Math.abs(prev.left - next.left) < 0.5 &&
+      Math.abs(prev.top - next.top) < 0.5 &&
+      Math.abs(prev.width - next.width) < 0.5 &&
+      Math.abs(prev.height - next.height) < 0.5
+        ? prev
+        : next
+    );
+  }, []);
+
+  // 选区变化后同步重测；数据/预览尺寸与回流引发的变化由手柄测量的副作用与 ResizeObserver 一并覆盖
+  useLayoutEffect(() => {
+    measureSelection();
+  }, [rect, measureSelection]);
 
   // ----- 行高列宽调整 -----
 
@@ -662,11 +758,20 @@ export const TableEditor = ({ path }: { path: string }) => {
     const handleUp = () => {
       const preview = previewRef.current;
       if (preview && dataRef.current) {
-        // 松开后才提交尺寸并触发保存
-        const next = structuredClone(dataRef.current);
-        next.colWidths = preview.colWidths;
-        next.rowHeights = preview.rowHeights;
-        commit(next);
+        // 松开后才提交尺寸并触发保存；尺寸未变化（误触手柄的零位移点击）
+        // 不提交，避免产生一个空撤销单元与无意义的保存
+        const cur = dataRef.current;
+        const curCols = getTableColWidths(cur.colWidths, cur.cols);
+        const curRows = getTableRowHeights(cur.rowHeights, cur.rows);
+        const changed =
+          preview.colWidths.some((w, i) => w !== curCols[i]) ||
+          preview.rowHeights.some((h, i) => h !== curRows[i]);
+        if (changed) {
+          const next = structuredClone(cur);
+          next.colWidths = preview.colWidths;
+          next.rowHeights = preview.rowHeights;
+          commit(next);
+        }
       }
       resizeRef.current = null;
       previewRef.current = null;
@@ -711,10 +816,12 @@ export const TableEditor = ({ path }: { path: string }) => {
     });
   }, []);
 
-  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐
+  // 数据/预览尺寸变化会在布局后同步触发测量，保证手柄与内容撑开后的边界实时对齐；
+  // 选区覆盖层随同一时机重测，跟随行高列宽变化
   useLayoutEffect(() => {
     measureBoundaries();
-  }, [data, resizePreview, measureBoundaries]);
+    measureSelection();
+  }, [data, resizePreview, measureBoundaries, measureSelection]);
 
   // 字体加载、窗口缩放等异步回流导致的行高变化由 ResizeObserver 兜底重新测量
   useEffect(() => {
@@ -722,12 +829,15 @@ export const TableEditor = ({ path }: { path: string }) => {
     if (!table || typeof ResizeObserver === 'undefined') {
       return;
     }
-    const observer = new ResizeObserver(() => measureBoundaries());
+    const observer = new ResizeObserver(() => {
+      measureBoundaries();
+      measureSelection();
+    });
     observer.observe(table);
     return () => {
       observer.disconnect();
     };
-  }, [data, measureBoundaries]);
+  }, [data, measureBoundaries, measureSelection]);
 
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
@@ -759,168 +869,399 @@ export const TableEditor = ({ path }: { path: string }) => {
   const firstCell = data.cells[rect?.r1 ?? 0]?.[rect?.c1 ?? 0];
   const currentAlign = firstCell?.align ?? 'left';
   const currentValign = firstCell?.valign ?? 'top';
+  const currentFontSize = firstCell?.fontSize ?? 14;
   const currentEffects = {
     bold: firstCell?.bold ?? false,
     underline: firstCell?.underline ?? false,
     strikethrough: firstCell?.strikethrough ?? false,
   };
 
+  const canUnmerge = !!rect && hasMergeInRect(data, rect);
+
+  // 编辑单格（选区即该格）时隐藏覆盖层：编辑框自带描边，避免两者叠加成双重粗环；
+  // 多格选区进入编辑时覆盖层保留，维持选区范围指示
+  const overlayHiddenByEditing =
+    !!editing && !!rect && rect.r1 === rect.r2 && rect.c1 === rect.c2;
+
+  // 根容器兜底：焦点落在表格容器外的子树元素（如工具岛按钮）时也能用
+  // 快捷键撤销/重做；表格容器内的按键已 preventDefault，此处靠
+  // defaultPrevented 跳过，避免同一按键触发两次
+  const handleRootKeyDown = (event: React.KeyboardEvent) => {
+    if (!event.defaultPrevented) {
+      tryUndoRedoKey(event);
+    }
+  };
+
+  // 根容器兜底：点击编辑器内空白（画布留白等不可聚焦区域）后浏览器的
+  // mousedown 默认行为会把焦点清到 body，按键事件不再经过本子树，撤销等
+  // 快捷键全部失灵（点击其他单元格才会恢复）。preventDefault 拦住默认
+  // 焦点转移并把焦点收回表格容器；编辑框与拖拽手柄的 mousedown 已自行
+  // 阻止冒泡，工具岛按钮自己也 preventDefault 防夺焦，均不受影响
+  const handleRootMouseDown = (event: React.MouseEvent) => {
+    event.preventDefault();
+    focusTableWrap();
+  };
+
   return (
-    <div className="table-editor">
-      <div className="table-editor__toolbar">
-        <button type="button" className="table-editor__tool-button" onClick={handleInsertRow}>
-          {t('table.insertRow')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={data.rows <= 1}
-          onClick={handleDeleteRow}
-        >
-          {t('table.deleteRow')}
-        </button>
-        <button type="button" className="table-editor__tool-button" onClick={handleInsertCol}>
-          {t('table.insertCol')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={data.cols <= 1}
-          onClick={handleDeleteCol}
-        >
-          {t('table.deleteCol')}
-        </button>
-        <span className="table-editor__separator" />
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={!canMerge}
-          onClick={handleMerge}
-        >
-          {t('table.merge')}
-        </button>
-        <button
-          type="button"
-          className="table-editor__tool-button"
-          disabled={!rect || !hasMergeInRect(data, rect)}
-          onClick={handleUnmerge}
-        >
-          {t('table.unmerge')}
-        </button>
-        <span className="table-editor__separator" />
-        <label className="table-editor__tool-item">
-          <span>{t('popupToolbar.stroke')}</span>
-          <select
-            value=""
-            onChange={(event) => {
-              const mode = event.target.value as BorderMode;
-              if (mode) {
-                applyBorder(mode);
+    <div
+      className="table-editor"
+      onKeyDown={handleRootKeyDown}
+      onMouseDown={handleRootMouseDown}
+    >
+      <div className="editor-island-wrap table-editor__island-wrap">
+        <EditorIsland role="toolbar" aria-orientation="horizontal">
+          {/* 撤销/重做：覆盖结构/样式/单元格文本的文件级历史栈 */}
+          <EditorIslandButton
+            label={t('general.undo')}
+            disabled={!history.canUndo}
+            disabledReason={t('editor.undo.disabled')}
+            onClick={() => {
+              handleUndo();
+              focusTableWrap();
+            }}
+          >
+            <IslandUndoIcon />
+          </EditorIslandButton>
+          <EditorIslandButton
+            label={t('general.redo')}
+            disabled={!history.canRedo}
+            disabledReason={t('editor.redo.disabled')}
+            onClick={() => {
+              handleRedo();
+              focusTableWrap();
+            }}
+          >
+            <IslandRedoIcon />
+          </EditorIslandButton>
+          <EditorIslandSeparator />
+          {/* 结构组：行列 / 合并，禁用条件与原按钮一致 */}
+          <EditorIslandDropdown label={t('table.toolbar.rows')} icon={<IslandGridIcon />}>
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  icon={<IslandRowPlusIcon />}
+                  onClick={() => {
+                    handleInsertRow();
+                    close();
+                  }}
+                >
+                  {t('table.insertRow')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandRowMinusIcon />}
+                  disabled={data.rows <= 1}
+                  disabledReason={t('table.disabled.row')}
+                  onClick={() => {
+                    handleDeleteRow();
+                    close();
+                  }}
+                >
+                  {t('table.deleteRow')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandColPlusIcon />}
+                  onClick={() => {
+                    handleInsertCol();
+                    close();
+                  }}
+                >
+                  {t('table.insertCol')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandColMinusIcon />}
+                  disabled={data.cols <= 1}
+                  disabledReason={t('table.disabled.col')}
+                  onClick={() => {
+                    handleDeleteCol();
+                    close();
+                  }}
+                >
+                  {t('table.deleteCol')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown label={t('table.toolbar.merge')} icon={<IslandMergeIcon />}>
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  icon={<IslandMergeIcon />}
+                  disabled={!canMerge}
+                  disabledReason={t('table.disabled.merge')}
+                  onClick={() => {
+                    handleMerge();
+                    close();
+                  }}
+                >
+                  {t('table.merge')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  icon={<IslandUnmergeIcon />}
+                  disabled={!canUnmerge}
+                  disabledReason={t('table.disabled.unmerge')}
+                  onClick={() => {
+                    handleUnmerge();
+                    close();
+                  }}
+                >
+                  {t('table.unmerge')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandSeparator />
+          {/* 边框文字组 */}
+          <EditorIslandDropdown
+            className="editor-island__desktop-only"
+            label={t('table.border')}
+            icon={<IslandBorderIcon />}
+          >
+            {(close) => (
+              <>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('all');
+                    close();
+                  }}
+                >
+                  {t('table.borderAll')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('none');
+                    close();
+                  }}
+                >
+                  {t('table.borderNone')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('outer');
+                    close();
+                  }}
+                >
+                  {t('table.borderOuter')}
+                </EditorIslandMenuItem>
+              </>
+            )}
+          </EditorIslandDropdown>
+          <Select.Root
+            size="2"
+            value={String(currentFontSize)}
+            onValueChange={(value) => applyStyle({ fontSize: Number(value) })}
+          >
+            <Select.Trigger
+              className="editor-island__select-trigger editor-island__desktop-only"
+              aria-label={t('popupToolbar.fontSize')}
+              onMouseDown={(event) => event.preventDefault()}
+            >
+              {currentFontSize}
+            </Select.Trigger>
+            <Select.Content container={container}>
+              {FONT_SIZES.map((size) => (
+                <Select.Item key={size} value={String(size)}>
+                  {size}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          {(
+            [
+              ['bold', 'B', 'bold'],
+              ['underline', 'U', 'underline'],
+              ['strikethrough', 'S', 'strike'],
+            ] as const
+          ).map(([effect, label, glyph]) => (
+            <EditorIslandButton
+              key={effect}
+              label={t(EFFECT_LABEL_KEYS[effect])}
+              active={currentEffects[effect]}
+              onClick={() =>
+                applyStyle({ [effect]: !currentEffects[effect] } as Partial<TableCellData>)
               }
-              event.target.value = '';
-            }}
+            >
+              <span className={`editor-island__glyph editor-island__glyph--${glyph}`}>{label}</span>
+            </EditorIslandButton>
+          ))}
+          <EditorIslandSeparator />
+          {/* 对齐颜色组：水平/垂直各三项，当前项带勾选 */}
+          <EditorIslandDropdown
+            className="editor-island__desktop-only"
+            label={t('table.toolbar.align')}
+            icon={<AlignIcon variant={`h-${currentAlign}`} />}
           >
-            <option value="" disabled>
-              {t('table.border')}
-            </option>
-            <option value="all">{t('table.borderAll')}</option>
-            <option value="none">{t('table.borderNone')}</option>
-            <option value="outer">{t('table.borderOuter')}</option>
-          </select>
-        </label>
-        <label className="table-editor__tool-item">
-          <span>{t('popupToolbar.fontSize')}</span>
-          <select
-            value=""
-            onChange={(event) => {
-              const size = Number(event.target.value);
-              applyStyle({ fontSize: size > 0 ? size : undefined });
-              event.target.value = '';
-            }}
-          >
-            <option value="" disabled>
-              {t('popupToolbar.fontSize')}
-            </option>
-            {FONT_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label
-          className="table-editor__tool-item table-editor__tool-item--color"
-          title={t('popupToolbar.fontColor')}
-        >
-          <span>{t('popupToolbar.fontColor')}</span>
-          <input
-            type="color"
-            defaultValue="#000000"
-            onChange={(event) => applyStyle({ color: event.target.value })}
-          />
-        </label>
-        <label
-          className="table-editor__tool-item table-editor__tool-item--color"
-          title={t('popupToolbar.fillColor')}
-        >
-          <span>{t('popupToolbar.fillColor')}</span>
-          <input
-            type="color"
-            defaultValue="#ffffff"
-            onChange={(event) => applyStyle({ bg: event.target.value })}
-          />
-        </label>
-        <span className="table-editor__separator" />
-        {(
-          [
-            ['bold', 'B'],
-            ['underline', 'U'],
-            ['strikethrough', 'S'],
-          ] as const
-        ).map(([effect, label]) => (
-          <button
-            key={effect}
-            type="button"
-            title={t(EFFECT_LABEL_KEYS[effect])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentEffects[effect],
-            })}
-            onClick={() =>
-              applyStyle({ [effect]: !currentEffects[effect] } as Partial<TableCellData>)
+            {(close) => (
+              <>
+                {(['left', 'center', 'right'] as const).map((align) => (
+                  <EditorIslandMenuItem
+                    key={align}
+                    icon={<AlignIcon variant={`h-${align}`} />}
+                    current={currentAlign === align}
+                    onClick={() => {
+                      applyStyle({ align });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[align])}
+                  </EditorIslandMenuItem>
+                ))}
+                <EditorIslandMenuSeparator />
+                {(['top', 'middle', 'bottom'] as const).map((valign) => (
+                  <EditorIslandMenuItem
+                    key={valign}
+                    icon={<AlignIcon variant={`v-${valign}`} />}
+                    current={currentValign === valign}
+                    onClick={() => {
+                      applyStyle({ valign });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[valign])}
+                  </EditorIslandMenuItem>
+                ))}
+              </>
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown
+            label={t('popupToolbar.fontColor')}
+            icon={
+              <span className="editor-island__color-trigger">
+                <IslandTextColorIcon />
+                <span
+                  className="editor-island__color-chip"
+                  style={{ background: firstCell?.color ?? 'transparent' }}
+                />
+              </span>
             }
           >
-            <span className={`table-editor__effect-icon table-editor__effect-icon--${effect}`}>
-              {label}
-            </span>
-          </button>
-        ))}
-        {(['left', 'center', 'right'] as const).map((align) => (
-          <button
-            key={align}
-            type="button"
-            title={t(ALIGN_LABEL_KEYS[align])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentAlign === align,
-            })}
-            onClick={() => applyStyle({ align })}
+            {(close) => (
+              <EditorColorSwatches
+                value={firstCell?.color}
+                ariaLabel={t('popupToolbar.fontColor')}
+                onColorChange={(color) => {
+                  applyStyle({ color });
+                  close();
+                }}
+              />
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandDropdown
+            label={t('popupToolbar.fillColor')}
+            icon={
+              <span className="editor-island__color-trigger">
+                <IslandFillIcon />
+                <span
+                  className="editor-island__color-chip"
+                  style={{ background: firstCell?.bg ?? 'transparent' }}
+                />
+              </span>
+            }
           >
-            <AlignIcon variant={`h-${align}`} />
-          </button>
-        ))}
-        {(['top', 'middle', 'bottom'] as const).map((valign) => (
-          <button
-            key={valign}
-            type="button"
-            title={t(ALIGN_LABEL_KEYS[valign])}
-            className={classNames('table-editor__tool-button', 'table-editor__tool-button--icon', {
-              'table-editor__tool-button--active': currentValign === valign,
-            })}
-            onClick={() => applyStyle({ valign })}
+            {(close) => (
+              <EditorColorSwatches
+                value={firstCell?.bg}
+                ariaLabel={t('popupToolbar.fillColor')}
+                onColorChange={(color) => {
+                  applyStyle({ bg: color });
+                  close();
+                }}
+              />
+            )}
+          </EditorIslandDropdown>
+          <EditorIslandSeparator />
+          {/* 帮助：正文沿用 table.selectionHint 全文，不改措辞 */}
+          <EditorIslandDropdown
+            label={t('table.toolbar.help')}
+            icon={<IslandHelpIcon />}
+            iconOnly
+            placement="bottom-end"
           >
-            <AlignIcon variant={`v-${valign}`} />
-          </button>
-        ))}
-        <span className="table-editor__hint">{t('table.selectionHint')}</span>
+            <div className="editor-island-help">
+              <div className="editor-island-help__title">{t('table.help.title')}</div>
+              <p>{t('table.selectionHint')}</p>
+            </div>
+          </EditorIslandDropdown>
+          {/* 更多（仅窄屏渲染）：收纳桌面端隐藏的低频组 */}
+          <EditorIslandDropdown
+            className="editor-island__mobile-only"
+            label={t('table.toolbar.more')}
+            icon={MoreIcon}
+            iconOnly
+            placement="bottom-end"
+          >
+            {(close) => (
+              <>
+                <EditorIslandMenuTitle>{t('table.border')}</EditorIslandMenuTitle>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('all');
+                    close();
+                  }}
+                >
+                  {t('table.borderAll')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('none');
+                    close();
+                  }}
+                >
+                  {t('table.borderNone')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuItem
+                  onClick={() => {
+                    applyBorder('outer');
+                    close();
+                  }}
+                >
+                  {t('table.borderOuter')}
+                </EditorIslandMenuItem>
+                <EditorIslandMenuSeparator />
+                <EditorIslandMenuTitle>{t('table.toolbar.align')}</EditorIslandMenuTitle>
+                {(['left', 'center', 'right'] as const).map((align) => (
+                  <EditorIslandMenuItem
+                    key={`h-${align}`}
+                    icon={<AlignIcon variant={`h-${align}`} />}
+                    current={currentAlign === align}
+                    onClick={() => {
+                      applyStyle({ align });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[align])}
+                  </EditorIslandMenuItem>
+                ))}
+                {(['top', 'middle', 'bottom'] as const).map((valign) => (
+                  <EditorIslandMenuItem
+                    key={`v-${valign}`}
+                    icon={<AlignIcon variant={`v-${valign}`} />}
+                    current={currentValign === valign}
+                    onClick={() => {
+                      applyStyle({ valign });
+                      close();
+                    }}
+                  >
+                    {t(ALIGN_LABEL_KEYS[valign])}
+                  </EditorIslandMenuItem>
+                ))}
+                <EditorIslandMenuSeparator />
+                <EditorIslandMenuTitle>{t('popupToolbar.fontSize')}</EditorIslandMenuTitle>
+                {FONT_SIZES.map((size) => (
+                  <EditorIslandMenuItem
+                    key={size}
+                    current={currentFontSize === size}
+                    onClick={() => {
+                      applyStyle({ fontSize: size });
+                      close();
+                    }}
+                  >
+                    {size}
+                  </EditorIslandMenuItem>
+                ))}
+              </>
+            )}
+          </EditorIslandDropdown>
+        </EditorIsland>
       </div>
       <div className="table-editor__canvas">
         <div
@@ -987,10 +1328,43 @@ export const TableEditor = ({ path }: { path: string }) => {
                                 editor.setSelectionRange(editor.value.length, editor.value.length);
                               }}
                               onBlur={(event) => {
+                                if (suppressBlurRef.current) {
+                                  suppressBlurRef.current = false;
+                                  setEditing(null);
+                                  return;
+                                }
                                 setCellText(r, c, event.target.value);
                                 setEditing(null);
                               }}
                               onKeyDown={(event) => {
+                                // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y：与电子表格的
+                                // 单元格编辑行为一致，草稿有未提交修改时先放弃本次
+                                // 输入并退出编辑（不消耗历史栈，避免错位回滚上一次
+                                // 提交），无未提交修改时才走文件级历史栈；移焦回容器
+                                // 会触发 blur，须先挂 suppress 标记跳过本次提交
+                                if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+                                  const key = event.key.toLowerCase();
+                                  const isUndo = key === 'z' && !event.shiftKey;
+                                  const isRedo =
+                                    (key === 'z' && event.shiftKey) ||
+                                    (key === 'y' && !event.shiftKey);
+                                  if (isUndo || isRedo) {
+                                    event.preventDefault();
+                                    suppressBlurRef.current = true;
+                                    if (draft !== (data?.cells[r]?.[c]?.text ?? '')) {
+                                      setEditing(null);
+                                      focusTableWrap();
+                                      return;
+                                    }
+                                    if (isRedo) {
+                                      handleRedo();
+                                    } else {
+                                      handleUndo();
+                                    }
+                                    focusTableWrap();
+                                    return;
+                                  }
+                                }
                                 // 回车提交并退出编辑（Shift+回车换行）；
                                 // Escape 同样走 blur 提交，避免误按丢失输入
                                 if (
@@ -1023,6 +1397,19 @@ export const TableEditor = ({ path }: { path: string }) => {
               ))}
             </tbody>
           </table>
+          {/* 选区覆盖层：WPS 式选区——选中区域最外一圈连续边框 + 内部半透明颜色覆盖；
+              pointer-events:none 不拦截单元格点击，编辑单格时隐藏避免与编辑框描边叠加 */}
+          {selectionBounds && !overlayHiddenByEditing && (
+            <div
+              className="table-editor__selection-overlay"
+              style={{
+                left: selectionBounds.left,
+                top: selectionBounds.top,
+                width: selectionBounds.width,
+                height: selectionBounds.height,
+              }}
+            />
+          )}
           {/* 列边界拖拽手柄：覆盖在每列右侧边界上，实时预览、松开提交 */}
           {colWidths.map((_, c) => (
             <div

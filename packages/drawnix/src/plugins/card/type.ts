@@ -41,6 +41,13 @@ export interface CardElement extends PlaitGeometry {
   fileType?: FileRefType;
 }
 
+/** 文件引用卡片元素：filePath 已确定存在（isFileRefCard 守卫后的形态），
+ *  守卫后的类型必须是 CardElement 的子类型，否则全量谓词会把
+ *  卡片渲染组件的 else 分支收窄成 never */
+export interface FileRefCardElement extends CardElement {
+  filePath: string;
+}
+
 export const Card = {
   isCard: (value: unknown): value is CardElement => {
     return (
@@ -52,11 +59,11 @@ export const Card = {
       (value as { customType: string }).customType === CARD_TYPE
     );
   },
-  isFileRefCard: (value: unknown): value is CardElement => {
+  isFileRefCard: (value: unknown): value is FileRefCardElement => {
     return (
       Card.isCard(value) &&
-      typeof (value as CardElement).filePath === 'string' &&
-      (value as CardElement).filePath.length > 0
+      typeof value.filePath === 'string' &&
+      value.filePath.length > 0
     );
   },
 };

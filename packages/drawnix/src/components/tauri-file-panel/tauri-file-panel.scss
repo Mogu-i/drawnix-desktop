@@ -1,9 +1,31 @@
 @use '../../styles/variables.scss' as *;
 
 .drawnix {
+  // 窄屏抽屉遮罩（G2/G4）：面板的兄弟元素，点击收起面板
+  .tauri-file-panel__mask {
+    display: none;
+
+    @media (max-width: 760px) {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 61;
+      background: rgba(31, 45, 84, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease;
+
+      &.tauri-file-panel__mask--open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    }
+  }
+
   .tauri-file-panel {
-    flex: 0 0 240px;
-    width: 240px;
+    // 侧栏在右，桌面宽 268px（A1），层级 10（G4）
+    flex: 0 0 var(--wb-sidebar-w);
+    width: var(--wb-sidebar-w);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -11,66 +33,242 @@
     border-radius: 0;
     box-shadow: none;
     border: none;
-    border-right: 1px solid var(--island-border-color);
+    border-left: 1px solid var(--island-border-color);
+    z-index: 10;
 
-    @include isMobile {
-      display: none;
+    // 窄屏变右侧抽屉（G2）：默认移出视口，打开时归位
+    @media (max-width: 760px) {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(86vw, 300px);
+      flex: 0 0 auto;
+      z-index: 62;
+      transform: translateX(105%);
+      transition: transform 0.24s ease;
+      border-left: 1px solid var(--dx-border-hairline);
+      box-shadow: var(--dx-shadow-dialog);
+
+      &.tauri-file-panel--drawer-open {
+        transform: translateX(0);
+      }
     }
 
+    // 品牌头（C1）：logo + 思画/DRAWNIX + 窗口三钮。
+    // 高度与页签栏共用 --wb-tabbar-h；border-box 让底边线与页签栏（同为 border-box）严格对齐
     .tauri-file-panel__header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 12px 12px 8px;
+      gap: 10px;
+      box-sizing: border-box;
+      height: var(--wb-tabbar-h);
+      // 面板 Island 的 padding 已收零，这里补回原视觉内边距（原 8px 面板留白 + 14/6px）
+      padding: 0 14px 0 22px;
+      flex-shrink: 0;
       border-bottom: 1px solid var(--island-border-color);
     }
 
-    .tauri-file-panel__title {
-      font-weight: 600;
-      font-size: 14px;
-      color: var(--color-on-surface);
-      white-space: nowrap;
+    .tauri-file-panel__brand-logo {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: block;
+      // 图形自带圆角容器与磨砂/刷纹质感，外层仅做尺寸约束；圆角兼作边缘裁切兑底
+      border-radius: 9px;
+      object-fit: contain;
     }
 
-    .tauri-file-panel__current {
-      font-size: 12px;
-      color: var(--color-on-surface-muted, #888);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .tauri-file-panel__brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .tauri-file-panel__brand-name {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--color-on-surface);
+    }
+
+    .tauri-file-panel__brand-en {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1.4px;
+      line-height: 1.2;
+      color: var(--color-on-surface-muted);
+    }
+
+    // 窗口三钮贴头部右侧（D1），与品牌区隔开；窄屏隐藏（原型 r3-final sidebarWinControlsHidden），
+    // 窗口操作由页签栏「窗口」菜单替代（D6）
+    .tauri-file-panel__header .window-controls {
+      margin-left: auto;
+
+      @media (max-width: 760px) {
+        display: none;
+      }
+    }
+
+    // 窄屏抽屉的「收起文件面板」（D6）：右箭头图标，与窗口关闭 × 区分；桌面不显示
+    .tauri-file-panel__drawer-collapse {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: var(--wb-icon-btn);
+      height: var(--wb-icon-btn);
+      flex-shrink: 0;
+      padding: 0;
+      border: none;
+      border-radius: var(--wb-r-s);
+      background: transparent;
+      color: var(--wb-text-2);
+      cursor: pointer;
+
+      svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+      }
+
+      &:hover {
+        background: var(--wb-line-soft);
+        color: var(--wb-text);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--wb-accent);
+        outline-offset: 1px;
+      }
+
+      @media (max-width: 760px) {
+        display: inline-flex;
+        margin-left: auto;
+      }
     }
 
     .tauri-file-panel__toolbar {
       display: flex;
-      gap: 6px;
-      padding: 8px 12px;
+      gap: 8px;
+      // 与侧边栏同底色（原灰底与面板背景不一致）；padding 补回原面板留白（8px + 12px）
+      padding: 10px 20px;
+      background-color: transparent;
+      border-bottom: 1px solid var(--dx-border-hairline);
     }
 
+    // 蓝色拆分按钮（C2）：外层占位（含悬停监听与宽度测量），内层为主按钮 + 箭头菜单
+    .tauri-file-panel__split-wrap {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+    }
+
+    .tauri-file-panel__split {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      height: var(--wb-split-h);
+    }
+
+    .tauri-file-panel__split-main {
+      flex: 1;
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: var(--dx-font-sm);
+      font-weight: 500;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      border-radius: var(--border-radius-md) 0 0 var(--border-radius-md);
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background-color var(--dx-duration-fast) var(--dx-ease);
+
+      svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+
+      &:hover {
+        background-color: var(--color-primary-darker);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
+      }
+    }
+
+    .tauri-file-panel__split-arrow {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      border: 1px solid transparent;
+      border-left: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      cursor: pointer;
+      transition: background-color var(--dx-duration-fast) var(--dx-ease);
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      &:hover {
+        background-color: var(--color-primary-darker);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
+      }
+    }
+
+    // 回收站视图的「清空回收站」按钮沿用原有样式
     .tauri-file-panel__new-button {
       display: block;
       flex: 1;
       min-width: 0;
-      font-size: 13px;
-      padding: 6px 8px;
-      border: 1px solid var(--island-border-color);
-      border-radius: var(--border-radius-sm);
+      font-size: var(--dx-font-sm);
+      padding: 7px 10px;
+      border: 1px solid transparent;
+      border-radius: var(--border-radius-md);
       background-color: var(--color-surface-secondary-container);
       color: var(--color-on-surface);
       cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      transition: background-color var(--dx-duration-fast) var(--dx-ease),
+        border-color var(--dx-duration-fast) var(--dx-ease);
 
       &:hover {
-        background-color: var(--color-surface-primary-container);
+        background-color: var(--color-surface-high);
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
       }
 
       &.tauri-file-panel__new-button--danger {
-        color: var(--color-error, #d13438);
+        color: var(--color-error);
 
         &:hover:not(:disabled) {
-          background-color: var(--color-surface-primary-container);
+          background-color: var(--color-error-lighter);
         }
 
         &:disabled {
@@ -86,7 +284,8 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding: 4px 8px 12px;
+      // 补回原面板留白（8px 面板 + 8px 自身）
+      padding: 4px 16px 12px;
     }
 
     .tauri-file-panel__empty {
@@ -110,17 +309,20 @@
     .tauri-file-panel__context-overlay {
       position: fixed;
       inset: 0;
-      z-index: 1000;
+      // 右键菜单遮罩层级（G4）：高于窄屏抽屉（62）、低于弹窗（70）
+      z-index: 64;
     }
 
     .tauri-file-panel__context-menu {
       position: fixed;
+      // 菜单本体必须盖住透明遮罩，否则菜单项不可点击
+      z-index: 65;
       min-width: 140px;
-      padding: 4px;
+      padding: 5px;
       background-color: var(--island-bg-color);
-      border: 1px solid var(--island-border-color);
-      border-radius: var(--border-radius-sm);
-      box-shadow: var(--shadow-island);
+      border: 1px solid var(--dx-border-hairline);
+      border-radius: var(--border-radius-md);
+      box-shadow: var(--dx-shadow-popover);
     }
 
     .tauri-file-panel__context-item-wrapper {
@@ -163,11 +365,11 @@
       top: 0;
       left: 100%;
       min-width: 120px;
-      padding: 4px;
+      padding: 5px;
       background-color: var(--island-bg-color);
-      border: 1px solid var(--island-border-color);
-      border-radius: var(--border-radius-sm);
-      box-shadow: var(--shadow-island);
+      border: 1px solid var(--dx-border-hairline);
+      border-radius: var(--border-radius-md);
+      box-shadow: var(--dx-shadow-popover);
     }
 
     .tauri-file-panel__group {
@@ -213,11 +415,10 @@
         flex: 0 0 auto;
         font-size: 10px;
         line-height: 1;
-        padding: 2px 5px;
-        border-radius: 999px;
-        background-color: var(--color-surface-secondary-container);
-        color: var(--color-on-surface-muted, #888);
-        font-weight: 500;
+        letter-spacing: 0.3px;
+        padding: 3px 6px;
+        border-radius: var(--dx-radius-full);
+        font-weight: 600;
       }
 
       &.tauri-file-panel__item--dragging {
@@ -239,19 +440,57 @@
       }
     }
 
+    // 三类文件类型图标（C5）：白板蓝 / 表格绿 / Markdown 橙
+    .tauri-file-panel__file-icon {
+      display: inline-flex;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      align-items: center;
+      justify-content: center;
+
+      svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      &.tauri-file-panel__file-icon--drawnix {
+        color: var(--wb-accent);
+      }
+
+      &.tauri-file-panel__file-icon--table {
+        color: var(--wb-ok);
+      }
+
+      &.tauri-file-panel__file-icon--md {
+        color: var(--wb-warn);
+      }
+    }
+
+    // 三类类型徽标配色（C5）：DRAWNIX / TABLE / MD
+    .tauri-file-panel__item-ext--drawnix {
+      color: var(--wb-accent);
+      background-color: var(--wb-accent-soft);
+    }
+
+    .tauri-file-panel__item-ext--table {
+      color: var(--wb-ok);
+      background-color: rgba(53, 169, 122, 0.12);
+    }
+
+    .tauri-file-panel__item-ext--md {
+      color: var(--wb-warn);
+      background-color: rgba(233, 162, 59, 0.14);
+    }
+
+    // 文件夹行（C3/C4）：div 容器承载拖拽，内部折叠按钮 + 计数 + 常驻「···」
     .tauri-file-panel__folder-row {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 2px;
+      min-height: 30px;
       font-size: 13px;
-      font-weight: 600;
-      text-align: left;
-      padding: 6px 6px;
-      border: none;
       border-radius: var(--border-radius-sm);
-      background-color: transparent;
-      color: var(--color-on-surface);
-      cursor: pointer;
       overflow: hidden;
       white-space: nowrap;
       transition: background-color 0.15s ease, box-shadow 0.15s ease;
@@ -285,6 +524,70 @@
       }
     }
 
+    .tauri-file-panel__folder-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: left;
+      padding: 6px 2px 6px 6px;
+      border: none;
+      background-color: transparent;
+      color: var(--color-on-surface);
+      cursor: pointer;
+      overflow: hidden;
+      white-space: nowrap;
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
+      }
+    }
+
+    // 文件夹计数（C4）
+    .tauri-file-panel__folder-count {
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--color-on-surface-muted);
+      padding: 0 2px;
+    }
+
+    // 常驻低对比度「···」操作按钮（C3）：点击打开行级右键菜单
+    .tauri-file-panel__folder-more {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      margin-right: 4px;
+      border: none;
+      border-radius: var(--border-radius-sm);
+      background-color: transparent;
+      color: var(--color-on-surface-muted);
+      opacity: 0.55;
+      cursor: pointer;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+
+      svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      &:hover {
+        opacity: 1;
+        background-color: var(--color-surface-high);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
+      }
+    }
+
     // 折叠/展开指示器：图标 + 旋转过渡动画
     .tauri-file-panel__chevron {
       flex-shrink: 0;
@@ -308,10 +611,11 @@
       }
     }
 
+    // 文件夹橙色实心徽标（C4）
     .tauri-file-panel__folder-icon {
       display: inline-flex;
       flex-shrink: 0;
-      color: var(--color-primary);
+      color: var(--wb-warn);
 
       svg {
         width: 14px;
@@ -323,10 +627,32 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+  }
 
-    .tauri-file-panel__new-folder-input {
-      margin: 0;
-      width: calc(100% - 4px);
+  // 新建菜单的类型图标（C5 配色）：菜单 portal 到 .drawnix 根、不在 .tauri-file-panel 内，
+  // 需在面板作用域之外定义；颜色与侧边栏文件图标一致（白板蓝 / 表格绿 / Markdown 橙 / 文件夹橙）
+  .tauri-file-panel__menu-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+
+    &.tauri-file-panel__menu-icon--board {
+      color: var(--wb-accent);
+    }
+
+    &.tauri-file-panel__menu-icon--table {
+      color: var(--wb-ok);
+    }
+
+    &.tauri-file-panel__menu-icon--md {
+      color: var(--wb-warn);
+    }
+
+    &.tauri-file-panel__menu-icon--folder {
+      color: var(--wb-warn);
     }
   }
 }

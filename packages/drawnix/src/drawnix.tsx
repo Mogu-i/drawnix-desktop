@@ -3,6 +3,7 @@ import {
   PlaitBoard,
   PlaitBoardOptions,
   PlaitElement,
+  PlaitOperation,
   PlaitPlugin,
   PlaitPointerType,
   PlaitTheme,
@@ -49,8 +50,13 @@ import { Toast, useToast } from './components/toast/toast';
 import { withCard, migrateLegacyBoardData } from './plugins/card/with-card';
 import { withTextSelection } from './plugins/with-text-selection';
 import { TauriFilePanel } from './components/tauri-file-panel/tauri-file-panel';
+import { TabBar } from './components/tab-bar/tab-bar';
+import { ExitConfirmDialog } from './components/exit-confirm-dialog/exit-confirm-dialog';
+import { setExitConfirmOpen } from './data/workbench-ui';
+import { interceptTauriWindowClose } from './data/tauri-window';
 import { WelcomePage } from './components/welcome-page/welcome-page';
 import { DocEditor } from './components/doc-editor/doc-editor';
+import { RestoreOpenedFile } from './components/restore-opened-file/restore-opened-file';
 import {
   isTauriEnvironment,
   markTauriFileDirty,
@@ -126,6 +132,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       isMobile: md.mobile() !== null,
       isPencilMode: false,
       isContentFullscreen: false,
+      isFullscreenToolbarVisible: true,
       fileHandle: null,
       openDialogType: null,
       openCleanConfirm: false,
@@ -153,7 +160,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     setBoardLanguage(board, lastKnownLanguageRef.current);
   }, [board]);
 
-  // 内容区全屏（铺满窗口）时按 Esc 退出
+  // 内容区全屏（铺满窗口）时按 Esc 退出，Ctrl+\ 切换创作工具栏显隐
   useEffect(() => {
     if (!appState.isContentFullscreen) {
       return;
@@ -162,12 +169,43 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       if (event.key === 'Escape') {
         setAppState((current) => ({ ...current, isContentFullscreen: false }));
       }
+      // Ctrl+\（沿用 Figma「显示/隐藏 UI」惯例）：全屏时在沉浸画面与可标注工具栏间切换
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        (event.key === '\\' || event.code === 'Backslash')
+      ) {
+        event.preventDefault();
+        setAppState((current) => ({
+          ...current,
+          isFullscreenToolbarVisible: !current.isFullscreenToolbarVisible,
+        }));
+      }
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => {
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [appState.isContentFullscreen]);
+
+  // Tauri 环境：拦截窗口关闭（系统关闭钮 / Alt+F4），先进入退出确认流程（D5）
+  useEffect(() => {
+    if (!isTauriEnvironment()) {
+      return;
+    }
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    interceptTauriWindowClose(() => setExitConfirmOpen(true)).then((unlisten) => {
+      if (cancelled) {
+        unlisten();
+      } else {
+        cleanup = unlisten;
+      }
+    });
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, []);
 
   const hasMountedToolStateRef = useRef(false);
   const onToolStateChangeRef = useRef(onToolStateChange);
@@ -268,6 +306,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
           className={classNames('drawnix', {
             'drawnix--mobile': appState.isMobile,
             'drawnix--content-fullscreen': appState.isContentFullscreen,
+            'drawnix--fullscreen-toolbar-hidden': !appState.isFullscreenToolbarVisible,
             [`theme--${themeColorMode}`]: themeColorMode,
           })}
           ref={containerRef}
@@ -279,7 +318,17 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             options={options}
             plugins={plugins}
             onChange={(data: BoardChangeData) => {
-              markTauriFileDirty();
+              // 仅元素内容变化才标脏：框选/滚动等也会触发 onChange，不加区分会把
+              // 未编辑的文件误标为有未保存修改（假脏橙点、切换文件时无谓写盘）；
+              // 主题切换不算在内——theme 会随 serializeAsJSON 写入文件，属于内容变化
+              const hasContentChange = data.operations.some(
+                (op) =>
+                  !PlaitOperation.isSetSelectionOperation(op) &&
+                  !PlaitOperation.isSetViewportOperation(op)
+              );
+              if (hasContentChange) {
+                markTauriFileDirty();
+              }
               onChange?.(data);
             }}
             onSelectionChange={onSelectionChange}
@@ -290,40 +339,48 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             }}
             onValueChange={onValueChange}
           >
-            <TauriFilePanel></TauriFilePanel>
-            <div className="drawnix-main">
-              <Board
-                afterInit={(board) => {
-                  const drawnixBoard = board as DrawnixBoard;
-                  applyToolStateToBoard(drawnixBoard, appState.toolState);
-                  setBoard(drawnixBoard);
-                  afterInit?.(board);
-                }}
-              >
-                {tutorial && board && !isTauriEnvironment() && <Tutorial />}
-              </Board>
-              {isDocOpen && currentFile && (
-                <DocEditor
-                  key={currentFile}
-                  path={currentFile}
-                  fileType={currentFileType as 'md' | 'table'}
-                ></DocEditor>
-              )}
-              {!isDocOpen && (
-                <>
-                  <AppToolbar></AppToolbar>
-                  <CreationToolbar></CreationToolbar>
-                  <ZoomToolbar></ZoomToolbar>
-                  <ThemeToolbar></ThemeToolbar>
-                  <PopupToolbar></PopupToolbar>
-                  <LinkPopup></LinkPopup>
-                  <ClosePencilToolbar></ClosePencilToolbar>
-                  <WelcomePage></WelcomePage>
-                </>
-              )}
-              <TTDDialog container={containerRef.current}></TTDDialog>
-              <CleanConfirm container={containerRef.current}></CleanConfirm>
+            {/* 工作台骨架：内容列（页签栏 + 白板区）在左，文件面板在右（A1） */}
+            <div className="wb-main">
+              <div className="wb-content">
+                <TabBar />
+                <div className="drawnix-main">
+                  <Board
+                    afterInit={(board) => {
+                      const drawnixBoard = board as DrawnixBoard;
+                      applyToolStateToBoard(drawnixBoard, appState.toolState);
+                      setBoard(drawnixBoard);
+                      afterInit?.(board);
+                    }}
+                  >
+                    {tutorial && board && !isTauriEnvironment() && <Tutorial />}
+                  </Board>
+                  {isDocOpen && currentFile && (
+                    <DocEditor
+                      key={currentFile}
+                      path={currentFile}
+                      fileType={currentFileType as 'md' | 'table'}
+                    ></DocEditor>
+                  )}
+                  <RestoreOpenedFile />
+                  {!isDocOpen && (
+                    <>
+                      <AppToolbar></AppToolbar>
+                      <CreationToolbar></CreationToolbar>
+                      <ZoomToolbar></ZoomToolbar>
+                      <ThemeToolbar></ThemeToolbar>
+                      <PopupToolbar></PopupToolbar>
+                      <LinkPopup></LinkPopup>
+                      <ClosePencilToolbar></ClosePencilToolbar>
+                      <WelcomePage></WelcomePage>
+                    </>
+                  )}
+                  <TTDDialog container={containerRef.current}></TTDDialog>
+                  <CleanConfirm container={containerRef.current}></CleanConfirm>
+                </div>
+              </div>
+              <TauriFilePanel></TauriFilePanel>
             </div>
+            <ExitConfirmDialog container={containerRef.current} />
             <Toast toast={toast} container={containerRef.current}></Toast>
           </Wrapper>
           <canvas className={`${LASER_POINTER_CLASS_NAME} mouse-course-hidden`}></canvas>

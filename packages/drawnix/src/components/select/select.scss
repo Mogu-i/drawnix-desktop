@@ -30,18 +30,18 @@
     outline: none;
 
     &:hover {
-      background-color: var(--color-gray-10);
-      border-color: var(--color-gray-40);
+      background-color: var(--color-surface-high);
+      border-color: var(--dx-border-strong);
     }
 
     &[data-state='open'] {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 1px var(--color-primary);
+      box-shadow: 0 0 0 3px var(--focus-highlight-color);
     }
 
     &:focus-visible {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 1px var(--color-primary);
+      box-shadow: 0 0 0 3px var(--focus-highlight-color);
     }
 
     &[data-disabled] {
@@ -81,14 +81,15 @@
   .dx-SelectContent {
     box-sizing: border-box;
     background-color: var(--island-bg-color);
-    border: 1px solid var(--island-border-color);
-    box-shadow: var(--shadow-island);
+    border: 1px solid var(--dx-border-hairline);
+    box-shadow: var(--dx-shadow-popover);
     border-radius: var(--border-radius-lg);
     padding: var(--dx-select-content-padding);
     min-width: var(--radix-select-trigger-width); /* Note: Floating UI might handle width */
     max-height: 300px;
     overflow: hidden;
-    z-index: 1000;
+    // 下拉浮层：需盖住所在弹窗（70）本体，属弹窗附属浮层
+    z-index: 71;
     display: flex;
     flex-direction: column;
 
@@ -134,11 +135,11 @@
     text-align: center;
 
     &[data-highlighted] {
-      background-color: var(--color-primary);
-      color: var(--color-icon-white);
-      
+      background-color: var(--color-surface-primary-container);
+      color: var(--color-primary-darker);
+
       .dx-SelectItemIndicator {
-        color: var(--color-icon-white);
+        color: var(--color-primary-darker);
       }
     }
 

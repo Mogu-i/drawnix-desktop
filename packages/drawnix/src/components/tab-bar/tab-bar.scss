@@ -1,0 +1,293 @@
+// 文件页签栏（工作台 chrome）：位于内容区上方，高 48px；
+// 页签 = 彩色类型图标（与侧边栏配色一致）+ 名称 + 未保存橙点 + 活动收起按钮；
+// 溢出横向滚动，左右边缘渐隐；右侧动作区为 窄屏窗口菜单
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--wb-tabbar-h);
+  padding: 0 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: var(--wb-surface);
+  border-bottom: 1px solid var(--wb-line);
+  position: relative;
+  z-index: 8;
+  font-family: var(--wb-font);
+
+  &__tabs-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  // 溢出渐隐：左右边缘 28px 渐变遮罩，按 data-can-* 状态显隐（A4）
+  &__tabs-wrap::before,
+  &__tabs-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+  }
+
+  &__tabs-wrap::before {
+    left: 0;
+    background: linear-gradient(to right, var(--wb-surface), transparent);
+  }
+
+  &__tabs-wrap::after {
+    right: 0;
+    background: linear-gradient(to left, var(--wb-surface), transparent);
+  }
+
+  &__tabs-wrap[data-can-left]::before,
+  &__tabs-wrap[data-can-right]::after {
+    opacity: 1;
+  }
+
+  &__tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    padding: 0 2px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--wb-tab-h);
+    max-width: 220px;
+    min-width: 0;
+    padding: 0 8px 0 10px;
+    border-radius: var(--wb-r-s);
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    color: var(--wb-text-2);
+    font-size: 13px;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      background: var(--wb-line-soft);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--wb-accent-line);
+    }
+  }
+
+  &__tab--active {
+    background: var(--wb-accent-soft);
+    color: var(--wb-text);
+
+    &:hover {
+      background: var(--wb-accent-soft);
+    }
+  }
+
+  // 页签类型图标（C5 同源）：白板蓝 / 表格绿 / Markdown 橙，配色与侧边栏文件项一致
+  &__tab-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+
+    svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
+  }
+
+  &__tab-icon--drawnix {
+    color: var(--wb-accent);
+  }
+
+  &__tab-icon--table {
+    color: var(--wb-ok);
+  }
+
+  &__tab-icon--md {
+    color: var(--wb-warn);
+  }
+
+  &__tab-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // 未保存橙点：visibility 占位避免页签宽度跳动（B2）
+  &__dot {
+    flex-shrink: 0;
+    width: var(--wb-dot-size);
+    height: var(--wb-dot-size);
+    border-radius: 50%;
+    background: var(--wb-warn);
+    visibility: hidden;
+  }
+
+  &__dot[data-visible] {
+    visibility: visible;
+  }
+
+  // 活动页签收起按钮（A3）
+  &__tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--wb-text-3);
+    cursor: pointer;
+
+    svg {
+      width: 12px;
+      height: 12px;
+      display: block;
+    }
+
+    &:hover {
+      background: var(--wb-line);
+      color: var(--wb-text);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--wb-accent-line);
+    }
+  }
+
+  // 行内重命名（B7）：输入框替换名称，错误气泡悬于下方
+  &__rename {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__rename-input {
+    width: 100%;
+    min-width: 120px;
+    height: 26px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    border: 1px solid var(--wb-accent);
+    border-radius: 6px;
+    background: var(--wb-surface);
+    color: var(--wb-text);
+    font-size: 13px;
+    font-family: inherit;
+
+    &:focus {
+      outline: none;
+    }
+
+    &[aria-invalid='true'] {
+      border-color: var(--wb-danger);
+    }
+  }
+
+  &__rename-error {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--wb-surface);
+    border: 1px solid var(--wb-danger);
+    color: var(--wb-danger-ink);
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: var(--wb-shadow-pop);
+    z-index: 3;
+  }
+
+  // ---- 右侧动作区 ----
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  // 窄屏窗口菜单（D6）：浅蓝底 / 蓝色描边，桌面隐藏；窄屏纯图标（原型 r3-final）
+  &__window-menu {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    height: var(--wb-btn-h);
+    padding: 0 12px;
+    border: 1px solid var(--wb-accent-line);
+    border-radius: var(--wb-r-s);
+    background: var(--wb-accent-soft);
+    color: var(--wb-accent);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    &:hover {
+      border-color: var(--wb-accent);
+      color: var(--wb-accent-ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--wb-accent);
+      outline-offset: 1px;
+    }
+  }
+
+  // 窄屏（≤760px）：页签栏高度沿用 --wb-tabbar-h，动作区收为纯图标（原型 r3-final），窗口菜单显示（D6）
+  @media screen and (max-width: 760px) {
+    padding: 0 8px;
+    gap: 8px;
+
+    // 纯图标化：窗口菜单的文字标签隐藏（图标语义由 title/aria-label 保留）
+    &__btn-label {
+      display: none;
+    }
+
+    &__tab {
+      max-width: 190px;
+    }
+
+    &__window-menu {
+      display: inline-flex;
+      padding: 0 8px;
+    }
+  }
+}

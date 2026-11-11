@@ -1,68 +1,21 @@
 // 文档编辑器覆盖层：铺满右侧主内容区，盖在白板与工具栏之上
-// （低于弹窗 z-index:1000 与欢迎页 z-index:500，保证面板弹窗可正常展示）
+// （低于欢迎页 50、窄屏抽屉 62 与弹窗 70，保证欢迎页与弹窗可正常展示）。
+// 文件名、类型与未保存状态由页签栏展示，这里仅承载编辑器本体
 .doc-editor {
   position: absolute;
   inset: 0;
-  z-index: 100;
+  z-index: 30;
   display: flex;
   flex-direction: column;
-  background: var(--island-bg-color, #fff);
-  color: var(--color-on-surface, #1a1a1a);
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--island-border-color, #e0e0e0);
-    flex: 0 0 auto;
-  }
-
-  &__badge {
-    font-size: 12px;
-    line-height: 1;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: var(--color-surface-secondary-container, #f0f0f0);
-    color: var(--color-on-surface-muted, #666);
-    white-space: nowrap;
-  }
-
-  &__filename {
-    flex: 1;
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__close {
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    border: 1px solid var(--island-border-color, #e0e0e0);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--color-on-surface, #1a1a1a);
-    cursor: pointer;
-
-    &:hover {
-      background: var(--color-surface-primary-container, #ececec);
-    }
-  }
+  background: var(--island-bg-color);
+  color: var(--color-on-surface);
 
   &__placeholder {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    color: var(--color-on-surface-muted, #888);
+    font-size: var(--dx-font-base);
+    color: var(--color-on-surface-muted);
   }
 }

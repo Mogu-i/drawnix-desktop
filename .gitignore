@@ -45,3 +45,6 @@ Thumbs.db
 .claude/settings.local.json
 
 .qoder
+
+# 设计任务过程工作区（截图证据与取证脚本，不入库）
+.oil-ui

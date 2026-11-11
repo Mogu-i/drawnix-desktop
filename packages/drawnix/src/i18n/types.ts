@@ -44,6 +44,8 @@ export interface Translations {
   'zoom.100': string;
   'zoom.fullscreen': string;
   'zoom.exitFullscreen': string;
+  'zoom.showToolbar': string;
+  'zoom.hideToolbar': string;
 
   // Themes
   'theme.default': string;
@@ -74,6 +76,9 @@ export interface Translations {
   // General
   'general.undo': string;
   'general.redo': string;
+  // Document editor history (undo/redo disabled hints)
+  'editor.undo.disabled': string;
+  'editor.redo.disabled': string;
   'general.menu': string;
   'general.moreOptions': string;
   'general.duplicate': string;
@@ -92,6 +97,7 @@ export interface Translations {
   'toast.tauriFile.exportFailed': string;
   'toast.tauriFile.deleteFailed': string;
   'toast.tauriFile.restoreFailed': string;
+  'toast.tauriFile.createFolderFailed': string;
 
   // Language
   'language.switcher': string;
@@ -191,6 +197,17 @@ export interface Translations {
   'table.bold': string;
   'table.underline': string;
   'table.strikethrough': string;
+  // Table editor toolbar island
+  'table.toolbar.rows': string;
+  'table.toolbar.merge': string;
+  'table.toolbar.align': string;
+  'table.toolbar.more': string;
+  'table.toolbar.help': string;
+  'table.help.title': string;
+  'table.disabled.row': string;
+  'table.disabled.col': string;
+  'table.disabled.merge': string;
+  'table.disabled.unmerge': string;
 
   // Markdown editor
   'markdown.placeholder': string;
@@ -217,9 +234,13 @@ export interface Translations {
   'markdown.tableTemplate': string;
   'markdown.linkPlaceholder': string;
   'markdown.imagePlaceholder': string;
-
-  // Doc editor overlay
-  'docEditor.close': string;
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': string;
+  'markdown.toolbar.more': string;
+  'markdown.toolbar.disabled': string;
+  'markdown.help.title': string;
+  'markdown.help.indent': string;
+  'markdown.help.list': string;
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': string;
@@ -255,11 +276,50 @@ export interface Translations {
   'login.button': string;
   'login.notAvailable': string;
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': string;
+  'workbench.brand.en': string;
+  'workbench.tab.more': string;
+  'workbench.tab.dirtySuffix': string;
+  'workbench.tab.closeTab': string;
+  'workbench.tab.collapsePanel': string;
+  'workbench.tab.windowMenu': string;
+  'workbench.window.group': string;
+  'workbench.window.minimize': string;
+  'workbench.window.maximize': string;
+  'workbench.window.restore': string;
+  'workbench.window.close': string;
+  'workbench.window.minimizeWindow': string;
+  'workbench.window.maximizeWindow': string;
+  'workbench.window.restoreWindow': string;
+  'workbench.window.closeWindow': string;
+  'workbench.window.maximizedToast': string;
+  'workbench.window.restoredToast': string;
+  'workbench.window.recoveredToast': string;
+  'workbench.panel.newBoard': string;
+  'workbench.panel.newTable': string;
+  'workbench.panel.newMd': string;
+  'workbench.panel.newFolder': string;
+  'workbench.panel.newMore': string;
+  'workbench.panel.folderItems': string;
+  'workbench.create.nameEmpty': string;
+  'workbench.create.nameDuplicate': string;
+  'workbench.create.folderLocation': string;
+  'workbench.save.success': string;
+  'workbench.save.noFile': string;
+  'workbench.exit.title': string;
+  'workbench.exit.dirtyDescription': string;
+  'workbench.exit.cleanDescription': string;
+  'workbench.exit.cancel': string;
+  'workbench.exit.confirm': string;
+
   // Welcome page (Tauri desktop)
   'welcome.title': string;
   'welcome.description': string;
   'welcome.newFile': string;
   'welcome.sidebarHint': string;
+  'welcome.emptyTitle': string;
+  'welcome.emptyDescription': string;
 
   // Link popup items
   'popupLink.delLink': string;

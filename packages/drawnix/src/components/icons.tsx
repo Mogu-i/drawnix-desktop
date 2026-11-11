@@ -304,6 +304,23 @@ export const ExitFullscreenIcon = createIcon(
   </svg>
 );
 
+/** 顶部工具栏（全屏模式下「工具栏显隐」切换钮专用） */
+export const ToolbarIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <g strokeWidth="1.5">
+      <rect x="2.5" y="7.5" width="19" height="9" rx="2"></rect>
+      <path d="M6.5 12h2.5M11 12h2.5M15.5 12h2.5"></path>
+    </g>
+  </svg>
+);
+
 export const SaveIcon = createIcon(
   <svg
     viewBox="0 0 24 24"
@@ -697,5 +714,169 @@ export const ArchiveIcon = createIcon(
       <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
       <path d="M10 12h4"></path>
     </g>
+  </svg>
+);
+
+// ---- 工作台 chrome 图标（页签栏 / 窗口控件 / 文件类型），24 视框线性描边 ----
+
+export const PlusIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 5v14M5 12h14"></path>
+  </svg>
+);
+
+export const CloseIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 6l12 12M18 6L6 18"></path>
+  </svg>
+);
+
+export const WinMinIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+  >
+    <path d="M5 12h14"></path>
+  </svg>
+);
+
+export const WinMaxIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="5.5" y="5.5" width="13" height="13" rx="1.5"></rect>
+  </svg>
+);
+
+export const WinRestoreIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="4.5" y="7.5" width="12" height="12" rx="1.5"></rect>
+    <path d="M8 7.5V6a1.5 1.5 0 0 1 1.5-1.5H18A1.5 1.5 0 0 1 19.5 6v8.5a1.5 1.5 0 0 1-1.5 1.5h-1.5"></path>
+  </svg>
+);
+
+export const PanelRightIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+    <line x1="14.5" y1="4.5" x2="14.5" y2="19.5"></line>
+  </svg>
+);
+
+/** 应用窗口（窄屏「窗口」菜单触发钮专用，原型 r3-final 同款） */
+export const AppWindowIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+    <path d="M3.5 9h17"></path>
+  </svg>
+);
+
+export const BoardIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+    <path d="M7 14.5c1.5-3 3-3 4.5 0s3 3 4.5 0"></path>
+  </svg>
+);
+
+export const TableIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+    <path d="M3.5 10h17M10 10v9.5"></path>
+  </svg>
+);
+
+/** 实心文件夹（文件夹徽标专用，配橙色底色） */
+export const FolderFilledIcon = createIcon(
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+    <path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"></path>
+  </svg>
+);
+
+export const MdIcon = createIcon(
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 3.5h8l4 4V18.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"></path>
+    <path d="M14 3.5V8h4"></path>
+    <path d="M8.5 13h7M8.5 16.5h4.5"></path>
+  </svg>
+);
+
+export const MoreIcon = createIcon(
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+    <circle cx="5" cy="12" r="1.4"></circle>
+    <circle cx="12" cy="12" r="1.4"></circle>
+    <circle cx="19" cy="12" r="1.4"></circle>
   </svg>
 );

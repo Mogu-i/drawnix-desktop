@@ -71,11 +71,12 @@ fn now_millis() -> u64 {
     .unwrap_or(0)
 }
 
+/// 回收站保留天数：限制在 1-90 天（规格设置校验同源）
 fn trash_retention_days(app: &tauri::AppHandle) -> u32 {
   load_settings(app)
     .trash_retention_days
     .unwrap_or(DEFAULT_TRASH_RETENTION_DAYS)
-    .max(1)
+    .clamp(1, 90)
 }
 
 fn default_files_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -649,7 +650,34 @@ fn rename_folder(app: tauri::AppHandle, path: String, new_name: String) -> Resul
   save_order(&app, &order)
 }
 
-/// 删除分组：内部所有受支持文件移入回收站，然后删除整个目录
+/// 根目录下唯一文件主干名：同名时自动追加 -2/-3 后缀
+fn unique_root_file_name(
+  app: &tauri::AppHandle,
+  name: &str,
+  ext: &str,
+) -> Result<String, String> {
+  let mut candidate = name.to_string();
+  let mut index = 2;
+  while file_path(app, &candidate, ext)?.exists() {
+    candidate = format!("{}-{}", name, index);
+    index += 1;
+  }
+  Ok(candidate)
+}
+
+/// 根目录下唯一文件夹名：同名时自动追加 -2/-3 后缀
+fn unique_root_dir_name(app: &tauri::AppHandle, name: &str) -> Result<String, String> {
+  let mut candidate = name.to_string();
+  let mut index = 2;
+  while entry_path(app, &candidate)?.exists() {
+    candidate = format!("{}-{}", name, index);
+    index += 1;
+  }
+  Ok(candidate)
+}
+
+/// 删除文件夹：组内文件与子文件夹提升到根目录（同名自动追加 -2/-3 后缀，
+/// 子文件夹整体移动保留内部结构），不受支持的文件移入回收站，然后移除目录
 #[tauri::command]
 fn delete_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
   let path = sanitize_rel_path(&path)?;
@@ -657,15 +685,43 @@ fn delete_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
   if !target.is_dir() {
     return Err("folder not found".to_string());
   }
-  let mut files = Vec::new();
-  let mut dirs = Vec::new();
-  collect_tree(&target, &path, &mut dirs, &mut files);
-  for file in files {
-    move_to_trash(&app, &file.path, &file.ext)?;
+  let mut order = load_order(&app);
+  let entries = fs::read_dir(&target).map_err(|e| e.to_string())?;
+  for entry in entries.flatten() {
+    let child_path = entry.path();
+    let name = child_path
+      .file_name()
+      .unwrap_or_default()
+      .to_string_lossy()
+      .to_string();
+    if child_path.is_dir() {
+      // 子文件夹整体提升到根目录，内部结构与索引键一并迁移
+      let unique = unique_root_dir_name(&app, &name)?;
+      let child_rel = format!("{}/{}", path, name);
+      let source = entry_path(&app, &child_rel)?;
+      let dest = entry_path(&app, &unique)?;
+      fs::rename(&source, &dest).map_err(|e| e.to_string())?;
+      order_migrate_dir_prefix(&mut order, &child_rel, &unique);
+    } else if let Some(ext) = FILE_EXTENSIONS
+      .iter()
+      .find(|e| name.ends_with(&format!(".{}", e)))
+    {
+      // 受支持文件提升到根目录
+      let stem = strip_known_ext(&name).unwrap_or(&name).to_string();
+      let unique = unique_root_file_name(&app, &stem, ext)?;
+      let child_rel = format!("{}/{}", path, stem);
+      let source = file_path(&app, &child_rel, ext)?;
+      let dest = file_path(&app, &unique, ext)?;
+      fs::rename(&source, &dest).map_err(|e| e.to_string())?;
+      if let Some(entry) = order.get_mut(&path) {
+        entry.files.retain(|n| *n != stem);
+      }
+      order.entry(String::new()).or_default().files.push(unique);
+    }
+    // 其他不受支持的文件不单独处理，随目录一并移除（与原有行为一致）
   }
   fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
   // 索引：父目录子文件夹列表移除该分组，并清理其键
-  let mut order = load_order(&app);
   let old_name = last_seg(&path).to_string();
   if let Some(entry) = order.get_mut(&dir_key(&path)) {
     entry.dirs.retain(|name| *name != old_name);
@@ -772,7 +828,7 @@ fn get_trash_retention_days(app: tauri::AppHandle) -> Result<u32, String> {
 #[tauri::command]
 fn set_trash_retention_days(app: tauri::AppHandle, days: u32) -> Result<(), String> {
   let mut settings = load_settings(&app);
-  settings.trash_retention_days = Some(days.max(1));
+  settings.trash_retention_days = Some(days.clamp(1, 90));
   save_settings(&app, &settings)
 }
 

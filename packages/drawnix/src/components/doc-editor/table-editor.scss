@@ -3,127 +3,29 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  // 作为工具岛定位壳的定位基准
+  position: relative;
 
-  &__toolbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--island-border-color, #e0e0e0);
-  }
-
-  &__tool-button {
-    font-size: 12px;
-    padding: 5px 10px;
-    border: 1px solid var(--island-border-color, #e0e0e0);
-    border-radius: var(--border-radius-sm, 4px);
-    background: var(--color-surface-secondary-container, #f5f5f5);
-    color: var(--color-on-surface, #1a1a1a);
-    cursor: pointer;
-    white-space: nowrap;
-
-    &:hover:not(:disabled) {
-      background: var(--color-surface-primary-container, #e8e8e8);
+  // 工具岛定位壳：窄屏收纳后左右贴边。
+  // 注：drawnix--mobile 加在 .drawnix 根上，本文件规则不在 .drawnix 内嵌套，
+  // isMobile mixin 会展开成同元素类拼接（永不匹配），故用后代选择器
+  &__island-wrap {
+    .drawnix--mobile & {
+      left: 12px;
+      right: 12px;
     }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    // 对齐等图标按钮
-    &--icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 6px;
-    }
-
-    // 当前生效的对齐方式高亮
-    &--active {
-      border-color: var(--color-primary, #4a90e2);
-      color: var(--color-primary, #4a90e2);
-    }
-  }
-
-  &__align-icon {
-    display: block;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    fill: none;
-  }
-
-  // 加粗/下划线/删除线按钮的字形图标
-  &__effect-icon {
-    display: block;
-    width: 16px;
-    font-size: 13px;
-    line-height: 16px;
-    text-align: center;
-
-    &--bold {
-      font-weight: 700;
-    }
-
-    &--underline {
-      text-decoration: underline;
-    }
-
-    &--strikethrough {
-      text-decoration: line-through;
-    }
-  }
-
-  &__tool-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--color-on-surface-muted, #666);
-
-    select {
-      font-size: 12px;
-      padding: 4px 6px;
-      border: 1px solid var(--island-border-color, #e0e0e0);
-      border-radius: var(--border-radius-sm, 4px);
-      background: var(--island-bg-color, #fff);
-      color: var(--color-on-surface, #1a1a1a);
-      outline: none;
-    }
-
-    &--color {
-      input[type='color'] {
-        width: 26px;
-        height: 26px;
-        padding: 0;
-        border: 1px solid var(--island-border-color, #e0e0e0);
-        border-radius: var(--border-radius-sm, 4px);
-        background: transparent;
-        cursor: pointer;
-      }
-    }
-  }
-
-  &__separator {
-    width: 1px;
-    height: 18px;
-    background: var(--island-border-color, #e0e0e0);
-  }
-
-  &__hint {
-    margin-left: auto;
-    font-size: 12px;
-    color: var(--color-on-surface-muted, #999);
   }
 
   &__canvas {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 16px;
+    // 顶部让出工具岛高度，岛不遮正文
+    padding: 84px 24px 24px;
+
+    .drawnix--mobile & {
+      padding: 84px 12px 12px;
+    }
   }
 
   &__table-wrap {
@@ -204,10 +106,20 @@
     cursor: cell;
     user-select: none;
 
-    &--selected {
-      outline: 2px solid var(--color-primary, #4a90e2);
-      outline-offset: -2px;
-    }
+    // --selected 不承载视觉样式：选区外观由 __selection-overlay 统一绘制，
+    // 此类仅作为覆盖层测量的 DOM 钩子
+  }
+
+  // 选区覆盖层：对齐选中 td 的并集矩形，WPS 式选区——
+  // 最外一圈连续边框 + 内部半透明颜色覆盖（网格线与内容透出可见）；
+  // 不拦截鼠标，单元格点击/拖拽选择不受影响
+  &__selection-overlay {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 2px solid var(--color-primary, #4a90e2);
+    background: var(--color-surface-primary-container);
   }
 
   // 展示态文字与编辑态镜像共用同一套排版规则，

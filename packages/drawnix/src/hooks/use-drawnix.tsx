@@ -77,6 +77,8 @@ export type DrawnixState = {
   isPencilMode: boolean;
   // 右侧内容展示区是否处于全屏（铺满窗口）模式
   isContentFullscreen: boolean;
+  // 全屏模式下创作工具栏（文本/形状/导图/连线）是否显示
+  isFullscreenToolbarVisible: boolean;
   fileHandle: DrawnixFileHandle;
   openDialogType: DialogType | null;
   openCleanConfirm: boolean;

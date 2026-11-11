@@ -19,8 +19,8 @@ import {
 } from './type';
 import {
   getTauriFileState,
-  openTauriDocEditor,
   saveToTauriFile,
+  setCurrentTauriFile,
 } from '../../data/tauri-file';
 
 const getCenterPoint = (board: PlaitBoard): Point => {
@@ -110,7 +110,7 @@ export const openFileRefCardEditor = (board: PlaitBoard, element: CardElement) =
   if (!filePath || !fileType) {
     return;
   }
-  const open = () => openTauriDocEditor(filePath, fileType);
+  const open = () => setCurrentTauriFile(filePath, fileType);
   const state = getTauriFileState();
   if (state.currentFile && state.fileType === 'drawnix' && state.dirty) {
     saveToTauriFile(board)

@@ -40,6 +40,8 @@ const enTranslations: Translations = {
   'zoom.100': 'Zoom to 100%',
   'zoom.fullscreen': 'Fullscreen',
   'zoom.exitFullscreen': 'Exit Fullscreen',
+  'zoom.showToolbar': 'Show toolbar',
+  'zoom.hideToolbar': 'Hide toolbar',
 
   // Themes
   'theme.default': 'Default',
@@ -70,6 +72,8 @@ const enTranslations: Translations = {
   // General
   'general.undo': 'Undo',
   'general.redo': 'Redo',
+  'editor.undo.disabled': 'Nothing to undo',
+  'editor.redo.disabled': 'Nothing to redo',
   'general.menu': 'App Menu',
   'general.moreOptions': 'More Options',
   'general.duplicate': 'Duplicate',
@@ -88,6 +92,8 @@ const enTranslations: Translations = {
   'toast.tauriFile.exportFailed': 'Export failed',
   'toast.tauriFile.deleteFailed': 'Delete failed',
   'toast.tauriFile.restoreFailed': 'Restore failed',
+  'toast.tauriFile.createFolderFailed':
+    'Failed to create folder. A folder with the same name may already exist',
   // Language
   'language.switcher': 'Language',
   'language.chinese': '中文',
@@ -146,8 +152,8 @@ const enTranslations: Translations = {
   'filePanel.newFolder': 'New group',
   'filePanel.newSubFolder': 'New subgroup',
   'filePanel.newFolderPlaceholder': 'Group name…',
-  'filePanel.folderLocation': 'Group',
-  'filePanel.defaultLocation': 'Root folder',
+  'filePanel.folderLocation': 'Folder',
+  'filePanel.defaultLocation': 'Top level',
   'filePanel.saveAs': 'Save as',
   'filePanel.exportImage': 'Export image',
   'filePanel.restore': 'Restore',
@@ -187,6 +193,18 @@ const enTranslations: Translations = {
   'table.underline': 'Underline',
   'table.strikethrough': 'Strikethrough',
 
+  // Table editor toolbar island
+  'table.toolbar.rows': 'Rows & Columns',
+  'table.toolbar.merge': 'Merge',
+  'table.toolbar.align': 'Alignment',
+  'table.toolbar.more': 'More',
+  'table.toolbar.help': 'Help',
+  'table.help.title': 'Tips',
+  'table.disabled.row': 'At least one row must remain',
+  'table.disabled.col': 'At least one column must remain',
+  'table.disabled.merge': 'Select multiple cells to merge them',
+  'table.disabled.unmerge': 'No merged cells in the selection to unmerge',
+
   // Markdown editor
   'markdown.placeholder': 'Type Markdown here…',
   'markdown.mode.label': 'View mode',
@@ -213,8 +231,13 @@ const enTranslations: Translations = {
   'markdown.linkPlaceholder': 'link text',
   'markdown.imagePlaceholder': 'image alt',
 
-  // Doc editor overlay
-  'docEditor.close': 'Close',
+  // Markdown editor toolbar island
+  'markdown.toolbar.insert': 'Insert',
+  'markdown.toolbar.more': 'More',
+  'markdown.toolbar.disabled': 'Available after the file loads',
+  'markdown.help.title': 'Tips',
+  'markdown.help.indent': 'Press Tab to indent the selected lines, Shift+Tab to outdent',
+  'markdown.help.list': 'Press Enter at the start of a list or quote line to continue its prefix',
 
   // Delete confirm dialog (move to trash)
   'deleteConfirm.title': 'Delete file',
@@ -223,9 +246,9 @@ const enTranslations: Translations = {
   'deleteConfirm.ok': 'Delete',
 
   // Delete folder confirm dialog
-  'folderDeleteConfirm.title': 'Delete group',
+  'folderDeleteConfirm.title': 'Delete folder',
   'folderDeleteConfirm.description':
-    'All files in the group will be moved to the trash and permanently removed after the retention period. Continue?',
+    'The folder will be deleted. Files and subfolders inside will be moved to the top level. Continue?',
 
   // Move entry dialog
   'moveDialog.title': 'Choose destination folder',
@@ -254,12 +277,53 @@ const enTranslations: Translations = {
   'login.button': 'Log in',
   'login.notAvailable': 'Login is not available yet',
 
+  // Workbench chrome (tab bar / right file panel / window controls)
+  'workbench.brand.name': '思画',
+  'workbench.brand.en': 'DRAWNIX',
+  'workbench.tab.more': 'More actions',
+  'workbench.tab.dirtySuffix': 'Unsaved changes',
+  'workbench.tab.closeTab': 'Close tab',
+  'workbench.tab.collapsePanel': 'Collapse file panel',
+  'workbench.tab.windowMenu': 'Window',
+  'workbench.window.group': 'Window',
+  'workbench.window.minimize': 'Minimize',
+  'workbench.window.maximize': 'Maximize',
+  'workbench.window.restore': 'Restore down',
+  'workbench.window.close': 'Close',
+  'workbench.window.minimizeWindow': 'Minimize window',
+  'workbench.window.maximizeWindow': 'Maximize window',
+  'workbench.window.restoreWindow': 'Restore window',
+  'workbench.window.closeWindow': 'Close window',
+  'workbench.window.maximizedToast': 'Maximized',
+  'workbench.window.restoredToast': 'Restored to window',
+  'workbench.window.recoveredToast': 'Window restored',
+  'workbench.panel.newBoard': 'New board',
+  'workbench.panel.newTable': 'New table',
+  'workbench.panel.newMd': 'New Markdown',
+  'workbench.panel.newFolder': 'New folder',
+  'workbench.panel.newMore': 'Choose what to create',
+  'workbench.panel.folderItems': '{count} items',
+  'workbench.create.nameEmpty': 'Please enter a file name',
+  'workbench.create.nameDuplicate': 'A file with this name already exists. Please choose another one.',
+  'workbench.create.folderLocation': 'Folder',
+  'workbench.save.success': 'Saved "{name}" to local file',
+  'workbench.save.noFile': 'Open a file first',
+  'workbench.exit.title': 'Exit Drawnix',
+  'workbench.exit.dirtyDescription':
+    '{count} files still have unsaved changes. Your content stays on this device, and you can continue editing after reopening.',
+  'workbench.exit.cleanDescription': 'All files are saved. You can reopen and continue editing anytime.',
+  'workbench.exit.cancel': 'Cancel',
+  'workbench.exit.confirm': 'Exit',
+
   // Welcome page (Tauri desktop)
   'welcome.title': 'Welcome to Drawnix',
   'welcome.description':
     'All-in-one whiteboard with mind maps, flowcharts and freehand drawing. Your data is stored in local files.',
   'welcome.newFile': 'New file',
   'welcome.sidebarHint': 'Or open an existing file from the sidebar',
+  'welcome.emptyTitle': 'No file open',
+  'welcome.emptyDescription':
+    'Create a board, table or Markdown, or pick a file from the tab bar above to continue editing.',
 
   // Link popup items
   'popupLink.delLink': 'Delete Link',

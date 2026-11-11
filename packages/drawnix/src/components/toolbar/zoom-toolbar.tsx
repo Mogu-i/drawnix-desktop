@@ -4,6 +4,7 @@ import { ToolButton } from '../tool-button';
 import {
   ExitFullscreenIcon,
   FullscreenIcon,
+  ToolbarIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from '../icons';
@@ -24,6 +25,7 @@ export const ZoomToolbar = () => {
   const container = PlaitBoard.getBoardContainer(board);
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const isContentFullscreen = appState.isContentFullscreen;
+  const isFullscreenToolbarVisible = appState.isFullscreenToolbarVisible;
   return (
     <Island
       padding={1}
@@ -108,6 +110,27 @@ export const ZoomToolbar = () => {
           }}
           className="zoom-in-button"
         />
+        {isContentFullscreen && (
+          <ToolButton
+            key={4}
+            type="button"
+            icon={ToolbarIcon}
+            visible={true}
+            title={t(
+              isFullscreenToolbarVisible ? 'zoom.hideToolbar' : 'zoom.showToolbar'
+            )}
+            aria-label={t(
+              isFullscreenToolbarVisible ? 'zoom.hideToolbar' : 'zoom.showToolbar'
+            )}
+            onPointerUp={() => {
+              setAppState((current) => ({
+                ...current,
+                isFullscreenToolbarVisible: !current.isFullscreenToolbarVisible,
+              }));
+            }}
+            className="toolbar-toggle-button"
+          />
+        )}
         <ToolButton
           key={3}
           type="button"
