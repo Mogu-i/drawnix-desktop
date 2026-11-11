@@ -72,6 +72,8 @@ const enTranslations: Translations = {
   // General
   'general.undo': 'Undo',
   'general.redo': 'Redo',
+  'editor.undo.disabled': 'Nothing to undo',
+  'editor.redo.disabled': 'Nothing to redo',
   'general.menu': 'App Menu',
   'general.moreOptions': 'More Options',
   'general.duplicate': 'Duplicate',
@@ -202,8 +204,6 @@ const enTranslations: Translations = {
   'table.disabled.col': 'At least one column must remain',
   'table.disabled.merge': 'Select multiple cells to merge them',
   'table.disabled.unmerge': 'No merged cells in the selection to unmerge',
-  'table.selectionOne': 'Selected {cell} · 1 cell',
-  'table.selectionMany': 'Selected {count} cells',
 
   // Markdown editor
   'markdown.placeholder': 'Type Markdown here…',

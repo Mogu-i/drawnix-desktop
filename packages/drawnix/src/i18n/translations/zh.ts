@@ -72,6 +72,8 @@ const zhTranslations: Translations = {
   // General
   'general.undo': '撤销',
   'general.redo': '重做',
+  'editor.undo.disabled': '没有可撤销的修改',
+  'editor.redo.disabled': '没有可重做的修改',
   'general.menu': '应用菜单',
   'general.moreOptions': '更多选项',
   'general.duplicate': '重复',
@@ -203,8 +205,6 @@ const zhTranslations: Translations = {
   'table.disabled.col': '至少保留一列',
   'table.disabled.merge': '选中多个单元格后才能合并',
   'table.disabled.unmerge': '选区内没有可取消的合并单元格',
-  'table.selectionOne': '已选中 {cell} · 共 1 个单元格',
-  'table.selectionMany': '已选中 {count} 个单元格',
 
   // Markdown editor
   'markdown.placeholder': '在此输入 Markdown 内容…',

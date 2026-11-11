@@ -12,6 +12,8 @@ import {
   EditorIslandMenuTitle,
   EditorIslandSeparator,
   IslandPlusIcon,
+  IslandRedoIcon,
+  IslandUndoIcon,
 } from './editor-toolbar-island';
 
 /** 视图模式：源码 / 分屏 / 预览（视图岛与窄屏「更多」菜单共用） */
@@ -207,6 +209,11 @@ const INSERT_GROUP: ToolbarItem[] = [
 type MarkdownToolbarProps = {
   onAction: (action: MarkdownAction) => void;
   disabled?: boolean;
+  /** 撤销/重做：历史栈由编辑器管理，工具岛只透传状态与回调 */
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   /** 当前视图模式：窄屏「更多」菜单中的视图切换用 */
   mode?: MarkdownViewMode;
   onViewModeChange?: (mode: MarkdownViewMode) => void;
@@ -217,6 +224,10 @@ type MarkdownToolbarProps = {
 export const MarkdownToolbar = ({
   onAction,
   disabled,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   mode,
   onViewModeChange,
 }: MarkdownToolbarProps) => {
@@ -254,6 +265,24 @@ export const MarkdownToolbar = ({
 
   return (
     <EditorIsland role="toolbar" aria-orientation="horizontal">
+      {/* 撤销/重做：覆盖键盘输入与工具栏动作的文本历史栈 */}
+      <EditorIslandButton
+        label={t('general.undo')}
+        disabled={disabled || !canUndo}
+        disabledReason={t('editor.undo.disabled')}
+        onClick={() => onUndo?.()}
+      >
+        <IslandUndoIcon />
+      </EditorIslandButton>
+      <EditorIslandButton
+        label={t('general.redo')}
+        disabled={disabled || !canRedo}
+        disabledReason={t('editor.redo.disabled')}
+        onClick={() => onRedo?.()}
+      >
+        <IslandRedoIcon />
+      </EditorIslandButton>
+      <EditorIslandSeparator />
       {renderGroup(INLINE_GROUP)}
       <EditorIslandSeparator />
       {renderGroup(HEADING_GROUP)}

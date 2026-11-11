@@ -72,6 +72,8 @@ const ruTranslations: Translations = {
   // General
   'general.undo': 'Отменить',
   'general.redo': 'Вернуть',
+  'editor.undo.disabled': 'Нет изменений для отмены',
+  'editor.redo.disabled': 'Нет изменений для повтора',
   'general.menu': 'Меню приложения',
   'general.moreOptions': 'Дополнительно',
   'general.duplicate': 'Дублировать',
@@ -205,8 +207,6 @@ const ruTranslations: Translations = {
   'table.disabled.col': 'Должен остаться хотя бы один столбец',
   'table.disabled.merge': 'Выберите несколько ячеек, чтобы объединить их',
   'table.disabled.unmerge': 'В выделении нет объединённых ячеек',
-  'table.selectionOne': 'Выбрано {cell} · 1 ячейка',
-  'table.selectionMany': 'Выбрано ячеек: {count}',
 
   // Markdown editor
   'markdown.placeholder': 'Введите Markdown здесь…',

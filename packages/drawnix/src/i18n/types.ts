@@ -76,6 +76,9 @@ export interface Translations {
   // General
   'general.undo': string;
   'general.redo': string;
+  // Document editor history (undo/redo disabled hints)
+  'editor.undo.disabled': string;
+  'editor.redo.disabled': string;
   'general.menu': string;
   'general.moreOptions': string;
   'general.duplicate': string;
@@ -205,8 +208,6 @@ export interface Translations {
   'table.disabled.col': string;
   'table.disabled.merge': string;
   'table.disabled.unmerge': string;
-  'table.selectionOne': string;
-  'table.selectionMany': string;
 
   // Markdown editor
   'markdown.placeholder': string;

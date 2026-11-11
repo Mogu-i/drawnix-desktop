@@ -3,6 +3,7 @@ import classNames from 'classnames';
 import { getTauriDocDraft, readTauriFile } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import { useDocAutoSave } from './use-doc-auto-save';
+import { useDocHistory } from './use-doc-history';
 import {
   applyMarkdownAction,
   continueListOnEnter,
@@ -64,7 +65,10 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
     };
   }, [path, markLoaded]);
 
-  const commitText = useCallback(
+  const history = useDocHistory<string>();
+
+  // 撤销/重做恢复用裸应用：直接写入状态，不走 commitText（否则恢复动作又进历史）
+  const applyText = useCallback(
     (next: string) => {
       textRef.current = next;
       setText(next);
@@ -73,12 +77,61 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
     [scheduleSave]
   );
 
+  const handleUndo = useCallback(() => {
+    history.undo(textRef.current, applyText);
+  }, [history, applyText]);
+
+  const handleRedo = useCallback(() => {
+    history.redo(textRef.current, applyText);
+  }, [history, applyText]);
+
+  /** 撤销/重做快捷键：返回 true 表示已处理（已 preventDefault） */
+  const tryUndoRedoKey = (event: React.KeyboardEvent): boolean => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+      return false;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        handleRedo();
+      } else {
+        handleUndo();
+      }
+      return true;
+    }
+    if (key === 'y' && !event.shiftKey) {
+      event.preventDefault();
+      handleRedo();
+      return true;
+    }
+    return false;
+  };
+
+  const commitText = useCallback(
+    (next: string, opts?: { coalesce?: boolean }) => {
+      if (textRef.current !== next) {
+        // 修改前保存旧快照：连续键入以 coalesce 合并为一个撤销单元
+        history.pushHistory(textRef.current, opts);
+      }
+      textRef.current = next;
+      setText(next);
+      scheduleSave();
+    },
+    [scheduleSave, history]
+  );
+
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    commitText(event.target.value);
+    commitText(event.target.value, { coalesce: true });
   };
 
   // 列表/引用行内回车自动延续前缀，空列表项回车退出列表
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y：受控 textarea 的浏览器原生撤销与
+    // React 状态不同步，统一拦截走自建历史栈
+    if (tryUndoRedoKey(event)) {
+      return;
+    }
     // Tab/Shift+Tab：插入/移除缩进（textarea 默认行为是移动焦点）
     if (event.key === 'Tab') {
       event.preventDefault();
@@ -188,8 +241,17 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
   const showEditor = mode !== 'preview';
   const showPreview = mode !== 'code';
 
+  // 根容器兜底：焦点落在编辑器子树内非编辑区元素（如工具岛按钮）时
+  // 也能用快捷键撤销/重做；编辑区内的按键已 preventDefault，
+  // 此处靠 defaultPrevented 跳过，避免同一按键触发两次
+  const handleRootKeyDown = (event: React.KeyboardEvent) => {
+    if (!event.defaultPrevented) {
+      tryUndoRedoKey(event);
+    }
+  };
+
   return (
-    <div className={`markdown-editor markdown-editor--${mode}`}>
+    <div className={`markdown-editor markdown-editor--${mode}`} onKeyDown={handleRootKeyDown}>
       {/* 格式工具岛：悬浮在编辑区顶部居中，预览模式不渲染 */}
       {showEditor && (
         <div className="editor-island-wrap markdown-editor__island-wrap">
@@ -198,6 +260,10 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
             disabled={text === null}
             mode={mode}
             onViewModeChange={handleModeChange}
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
           />
         </div>
       )}

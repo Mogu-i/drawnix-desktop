@@ -126,6 +126,22 @@ export const IslandFillIcon = () => (
   </svg>
 );
 
+/** 撤销：向左弯钩箭头 */
+export const IslandUndoIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M3.2 6.5h7.3a3.3 3.3 0 0 1 0 6.6H6.6" />
+    <path d="M6.3 3.5L3.2 6.5l3.1 3" />
+  </svg>
+);
+
+/** 重做：撤销镜像（向右弯钩箭头） */
+export const IslandRedoIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M12.8 6.5H5.5a3.3 3.3 0 0 0 0 6.6h3.9" />
+    <path d="M9.7 3.5l3.1 3-3.1 3" />
+  </svg>
+);
+
 /** 帮助 */
 export const IslandHelpIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">

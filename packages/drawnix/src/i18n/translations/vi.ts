@@ -72,6 +72,8 @@ const viTranslations: Translations = {
   // General
   'general.undo': 'Hoàn tác',
   'general.redo': 'Làm lại',
+  'editor.undo.disabled': 'Không có thay đổi để hoàn tác',
+  'editor.redo.disabled': 'Không có thay đổi để làm lại',
   'general.menu': 'Menu ứng dụng',
   'general.moreOptions': 'Tùy chọn khác',
   'general.duplicate': 'Nhân bản',
@@ -204,8 +206,6 @@ const viTranslations: Translations = {
   'table.disabled.col': 'Phải còn ít nhất một cột',
   'table.disabled.merge': 'Chọn nhiều ô để gộp chúng',
   'table.disabled.unmerge': 'Không có ô đã gộp nào trong vùng chọn để bỏ gộp',
-  'table.selectionOne': 'Đã chọn {cell} · 1 ô',
-  'table.selectionMany': 'Đã chọn {count} ô',
 
   // Markdown editor
   'markdown.placeholder': 'Nhập Markdown tại đây…',

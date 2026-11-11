@@ -43,16 +43,6 @@
     }
   }
 
-  // 选区气泡：更小的内边距与按钮（Island padding 由调用方传 1 => 4px）
-  .editor-island--bubble {
-    gap: 1px;
-
-    .editor-island__btn {
-      min-width: 30px;
-      height: 30px;
-    }
-  }
-
   // ---- 按钮：六态（默认/悬停/选中/焦点/禁用/展开） ----
   .editor-island__btn {
     display: inline-flex;

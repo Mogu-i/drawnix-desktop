@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
-import { flip, offset, shift, useFloating } from '@floating-ui/react';
 import {
   TableFileData,
   TableCellData,
@@ -15,6 +14,7 @@ import { MoreIcon } from '../icons';
 import { Select } from '../select/select';
 import './table-editor.scss';
 import { useDocAutoSave } from './use-doc-auto-save';
+import { useDocHistory } from './use-doc-history';
 import {
   AlignIcon,
   EditorColorSwatches,
@@ -32,9 +32,11 @@ import {
   IslandGridIcon,
   IslandHelpIcon,
   IslandMergeIcon,
+  IslandRedoIcon,
   IslandRowMinusIcon,
   IslandRowPlusIcon,
   IslandTextColorIcon,
+  IslandUndoIcon,
   IslandUnmergeIcon,
   useDrawnixContainer,
 } from './editor-toolbar-island';
@@ -142,17 +144,6 @@ const hasMergeInRect = (data: TableFileData, rect: SelectionRect) => {
   return false;
 };
 
-/** 选区起始列转 Excel 风格列名（0 -> A），用于选区提示坐标 */
-const toColumnName = (index: number): string => {
-  let rest = index;
-  let name = '';
-  do {
-    name = String.fromCharCode(65 + (rest % 26)) + name;
-    rest = Math.floor(rest / 26) - 1;
-  } while (rest >= 0);
-  return name;
-};
-
 /**
  * 编辑态镜像占位文本：与展示态同样以不换行空格兜底空内容，
  * 并给末尾换行补一个不可见字符，保证该换行产生的空行也计入高度
@@ -175,9 +166,9 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 始终保持当前文字换行后的实际高度（与保存后的展示态一致）
   const [draft, setDraft] = useState('');
   const mouseDownRef = useRef(false);
-  // 拖选进行中标志：按住鼠标拖选单元格期间隐藏选区气泡（ref 变化不触发渲染，
-  // 气泡显隐依赖 state）；松开后气泡恢复浮出
-  const [dragSelecting, setDragSelecting] = useState(false);
+  // 编辑态撤销/重做时主动移焦会触发 blur，此标记让该次 blur 跳过提交，
+  // 否则未提交的输入会被写回数据并覆盖恢复结果
+  const suppressBlurRef = useRef(false);
   const dataRef = useRef<TableFileData | null>(null);
   // 行高列宽拖拽调整：resizeRef 记录拖拽上下文，previewRef 记录最新预览尺寸
   const resizeRef = useRef<{
@@ -238,13 +229,68 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [path, markLoaded]);
 
+  const history = useDocHistory<TableFileData>();
+
+  // 撤销/重做恢复用裸应用：不走 commit（否则恢复动作又进历史）；
+  // 恢复后清空选区并退出编辑，避免选区引用到已失效的行列
+  const applyData = useCallback(
+    (snapshot: TableFileData) => {
+      dataRef.current = snapshot;
+      setData(snapshot);
+      setSel(null);
+      setEditing(null);
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (dataRef.current) {
+      history.undo(dataRef.current, applyData);
+    }
+  }, [history, applyData]);
+
+  const handleRedo = useCallback(() => {
+    if (dataRef.current) {
+      history.redo(dataRef.current, applyData);
+    }
+  }, [history, applyData]);
+
+  /** 撤销/重做快捷键：返回 true 表示已处理（已 preventDefault） */
+  const tryUndoRedoKey = (event: React.KeyboardEvent): boolean => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+      return false;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        handleRedo();
+      } else {
+        handleUndo();
+      }
+      return true;
+    }
+    if (key === 'y' && !event.shiftKey) {
+      event.preventDefault();
+      handleRedo();
+      return true;
+    }
+    return false;
+  };
+
   const commit = useCallback(
     (next: TableFileData) => {
+      // 修改前保存旧数据快照：结构化拷贝防止旧值被后续变更牵连；
+      // 所有结构/样式/单元格文本修改都汇入 commit，在此一处挂钩全覆盖
+      if (dataRef.current) {
+        history.pushHistory(structuredClone(dataRef.current));
+      }
       dataRef.current = next;
       setData(next);
       scheduleSave();
     },
-    [scheduleSave]
+    [scheduleSave, history]
   );
 
   const rect = useMemo<SelectionRect | null>(() => {
@@ -488,7 +534,6 @@ export const TableEditor = ({ path }: { path: string }) => {
       return;
     }
     mouseDownRef.current = true;
-    setDragSelecting(true);
     setSel({ anchor: { row, col }, focus: { row, col } });
   };
 
@@ -540,6 +585,11 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 选中态键盘处理：Enter 进入编辑，Tab/方向键切换单元格；
   // 编辑态按键由单元格内的 textarea 自行处理（此处冒泡时已在编辑中，直接忽略）
   const handleTableKeyDown = (event: React.KeyboardEvent) => {
+    // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（非编辑态）：允许无选区时使用，
+    // 须放在选区/修饰键检查之前；编辑态的撤销由单元格 textarea 自行处理
+    if (!editing && data && tryUndoRedoKey(event)) {
+      return;
+    }
     if (editing || !data || !sel || event.ctrlKey || event.altKey || event.metaKey) {
       return;
     }
@@ -580,10 +630,10 @@ export const TableEditor = ({ path }: { path: string }) => {
     setSel({ anchor: sel.anchor, focus: { row, col } });
   };
 
+  // 拖选结束（window mouseup）复位拖选标志，单元格 mouseenter 依赖它扩展选区
   useEffect(() => {
     const stopSelecting = () => {
       mouseDownRef.current = false;
-      setDragSelecting(false);
     };
     window.addEventListener('mouseup', stopSelecting);
     return () => {
@@ -708,11 +758,20 @@ export const TableEditor = ({ path }: { path: string }) => {
     const handleUp = () => {
       const preview = previewRef.current;
       if (preview && dataRef.current) {
-        // 松开后才提交尺寸并触发保存
-        const next = structuredClone(dataRef.current);
-        next.colWidths = preview.colWidths;
-        next.rowHeights = preview.rowHeights;
-        commit(next);
+        // 松开后才提交尺寸并触发保存；尺寸未变化（误触手柄的零位移点击）
+        // 不提交，避免产生一个空撤销单元与无意义的保存
+        const cur = dataRef.current;
+        const curCols = getTableColWidths(cur.colWidths, cur.cols);
+        const curRows = getTableRowHeights(cur.rowHeights, cur.rows);
+        const changed =
+          preview.colWidths.some((w, i) => w !== curCols[i]) ||
+          preview.rowHeights.some((h, i) => h !== curRows[i]);
+        if (changed) {
+          const next = structuredClone(cur);
+          next.colWidths = preview.colWidths;
+          next.rowHeights = preview.rowHeights;
+          commit(next);
+        }
       }
       resizeRef.current = null;
       previewRef.current = null;
@@ -780,114 +839,6 @@ export const TableEditor = ({ path }: { path: string }) => {
     };
   }, [data, measureBoundaries, measureSelection]);
 
-  // ----- 选区气泡 -----
-  // 单元格是真实 DOM：用选中 td 的并集矩形构造虚拟 reference，
-  // 由 @floating-ui/react 就近定位（offset 10 + flip + shift）；
-  // 编辑态/拖拽调尺寸/按住拖选单元格时不浮出，避免遮挡输入框、拖拽手柄与拖选目标单元格
-  const [bubbleAnchor, setBubbleAnchor] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!rect || editing || resizing || dragSelecting) {
-      setBubbleAnchor(null);
-      return;
-    }
-    const measure = () => {
-      const table = tableRef.current;
-      if (!table) {
-        return;
-      }
-      const cells = table.querySelectorAll('td.table-editor__cell--selected');
-      if (cells.length === 0) {
-        setBubbleAnchor(null);
-        return;
-      }
-      let left = Infinity;
-      let top = Infinity;
-      let right = -Infinity;
-      let bottom = -Infinity;
-      cells.forEach((cell) => {
-        const box = cell.getBoundingClientRect();
-        left = Math.min(left, box.left);
-        top = Math.min(top, box.top);
-        right = Math.max(right, box.right);
-        bottom = Math.max(bottom, box.bottom);
-      });
-      const next = { x: left, y: top, width: right - left, height: bottom - top };
-      // 矩形未变化时保持原引用，避免滚动惯性期间频繁重渲染
-      setBubbleAnchor((prev) =>
-        prev &&
-        Math.abs(prev.x - next.x) < 0.5 &&
-        Math.abs(prev.y - next.y) < 0.5 &&
-        Math.abs(prev.width - next.width) < 0.5 &&
-        Math.abs(prev.height - next.height) < 0.5
-          ? prev
-          : next
-      );
-    };
-    measure();
-    // 虚拟 reference 不适用 autoUpdate：canvas 内滚动/窗口变化时手动重测
-    window.addEventListener('scroll', measure, true);
-    window.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('scroll', measure, true);
-      window.removeEventListener('resize', measure);
-    };
-  }, [rect, editing, resizing, dragSelecting]);
-
-  const virtualReference = useMemo(() => {
-    if (!bubbleAnchor) {
-      return null;
-    }
-    const { x, y, width, height } = bubbleAnchor;
-    return {
-      getBoundingClientRect: () => ({
-        x,
-        y,
-        width,
-        height,
-        top: y,
-        left: x,
-        right: x + width,
-        bottom: y + height,
-        toJSON() {
-          return this;
-        },
-      }),
-    };
-  }, [bubbleAnchor]);
-
-  // strategy fixed：虚拟 reference 给出的是视口坐标（getBoundingClientRect）；
-  // 从选区右侧浮出：顶部被常驻工具岛占据、下方会盖住相邻单元格造成误触，
-  // 右侧空白区零遮挡（表格通常居左；空间不足时由 flip/shift 兜底）
-  const bubble = useFloating({
-    placement: 'right-start',
-    strategy: 'fixed',
-    middleware: [offset(10), flip(), shift({ padding: 8 })],
-  });
-  useEffect(() => {
-    if (virtualReference) {
-      bubble.refs.setReference(virtualReference);
-    }
-  }, [virtualReference, bubble.refs]);
-
-  // 选区短提示：从选区可靠推导才显示（单格显示坐标，多格显示数量）。
-  // 必须放在下方 early return 之前：hook 不能出现在条件 return 之后
-  const selectionNote = useMemo(() => {
-    if (!rect) {
-      return null;
-    }
-    const count = (rect.r2 - rect.r1 + 1) * (rect.c2 - rect.c1 + 1);
-    if (count === 1) {
-      return t('table.selectionOne').replace('{cell}', `${toColumnName(rect.c1)}${rect.r1 + 1}`);
-    }
-    return t('table.selectionMany').replace('{count}', String(count));
-  }, [rect, t]);
-
   if (loadFailed) {
     return <div className="doc-editor__placeholder">{t('toast.tauriFile.loadFailed')}</div>;
   }
@@ -932,10 +883,57 @@ export const TableEditor = ({ path }: { path: string }) => {
   const overlayHiddenByEditing =
     !!editing && !!rect && rect.r1 === rect.r2 && rect.c1 === rect.c2;
 
+  // 根容器兜底：焦点落在表格容器外的子树元素（如工具岛按钮）时也能用
+  // 快捷键撤销/重做；表格容器内的按键已 preventDefault，此处靠
+  // defaultPrevented 跳过，避免同一按键触发两次
+  const handleRootKeyDown = (event: React.KeyboardEvent) => {
+    if (!event.defaultPrevented) {
+      tryUndoRedoKey(event);
+    }
+  };
+
+  // 根容器兜底：点击编辑器内空白（画布留白等不可聚焦区域）后浏览器的
+  // mousedown 默认行为会把焦点清到 body，按键事件不再经过本子树，撤销等
+  // 快捷键全部失灵（点击其他单元格才会恢复）。preventDefault 拦住默认
+  // 焦点转移并把焦点收回表格容器；编辑框与拖拽手柄的 mousedown 已自行
+  // 阻止冒泡，工具岛按钮自己也 preventDefault 防夺焦，均不受影响
+  const handleRootMouseDown = (event: React.MouseEvent) => {
+    event.preventDefault();
+    focusTableWrap();
+  };
+
   return (
-    <div className="table-editor">
+    <div
+      className="table-editor"
+      onKeyDown={handleRootKeyDown}
+      onMouseDown={handleRootMouseDown}
+    >
       <div className="editor-island-wrap table-editor__island-wrap">
         <EditorIsland role="toolbar" aria-orientation="horizontal">
+          {/* 撤销/重做：覆盖结构/样式/单元格文本的文件级历史栈 */}
+          <EditorIslandButton
+            label={t('general.undo')}
+            disabled={!history.canUndo}
+            disabledReason={t('editor.undo.disabled')}
+            onClick={() => {
+              handleUndo();
+              focusTableWrap();
+            }}
+          >
+            <IslandUndoIcon />
+          </EditorIslandButton>
+          <EditorIslandButton
+            label={t('general.redo')}
+            disabled={!history.canRedo}
+            disabledReason={t('editor.redo.disabled')}
+            onClick={() => {
+              handleRedo();
+              focusTableWrap();
+            }}
+          >
+            <IslandRedoIcon />
+          </EditorIslandButton>
+          <EditorIslandSeparator />
           {/* 结构组：行列 / 合并，禁用条件与原按钮一致 */}
           <EditorIslandDropdown label={t('table.toolbar.rows')} icon={<IslandGridIcon />}>
             {(close) => (
@@ -1330,10 +1328,43 @@ export const TableEditor = ({ path }: { path: string }) => {
                                 editor.setSelectionRange(editor.value.length, editor.value.length);
                               }}
                               onBlur={(event) => {
+                                if (suppressBlurRef.current) {
+                                  suppressBlurRef.current = false;
+                                  setEditing(null);
+                                  return;
+                                }
                                 setCellText(r, c, event.target.value);
                                 setEditing(null);
                               }}
                               onKeyDown={(event) => {
+                                // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y：与电子表格的
+                                // 单元格编辑行为一致，草稿有未提交修改时先放弃本次
+                                // 输入并退出编辑（不消耗历史栈，避免错位回滚上一次
+                                // 提交），无未提交修改时才走文件级历史栈；移焦回容器
+                                // 会触发 blur，须先挂 suppress 标记跳过本次提交
+                                if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+                                  const key = event.key.toLowerCase();
+                                  const isUndo = key === 'z' && !event.shiftKey;
+                                  const isRedo =
+                                    (key === 'z' && event.shiftKey) ||
+                                    (key === 'y' && !event.shiftKey);
+                                  if (isUndo || isRedo) {
+                                    event.preventDefault();
+                                    suppressBlurRef.current = true;
+                                    if (draft !== (data?.cells[r]?.[c]?.text ?? '')) {
+                                      setEditing(null);
+                                      focusTableWrap();
+                                      return;
+                                    }
+                                    if (isRedo) {
+                                      handleRedo();
+                                    } else {
+                                      handleUndo();
+                                    }
+                                    focusTableWrap();
+                                    return;
+                                  }
+                                }
                                 // 回车提交并退出编辑（Shift+回车换行）；
                                 // Escape 同样走 blur 提交，避免误按丢失输入
                                 if (
@@ -1399,48 +1430,6 @@ export const TableEditor = ({ path }: { path: string }) => {
           ))}
         </div>
       </div>
-      {/* 选区气泡：fixed 定位跟随选中单元格并集矩形；直接渲染在编辑器内，
-          既能继承 .drawnix 变量，层级也天然低于页签栏/抽屉/弹窗 */}
-      {bubbleAnchor && (
-        <div
-          ref={bubble.refs.setFloating}
-          className="table-editor__bubble"
-          style={{ zIndex: 7, ...bubble.floatingStyles }}
-        >
-          <EditorIsland className="editor-island--bubble" role="toolbar">
-            <EditorIslandButton label={t('table.insertRow')} onClick={handleInsertRow}>
-              <IslandRowPlusIcon />
-            </EditorIslandButton>
-            <EditorIslandButton
-              label={t('table.deleteRow')}
-              disabled={data.rows <= 1}
-              disabledReason={t('table.disabled.row')}
-              onClick={handleDeleteRow}
-            >
-              <IslandRowMinusIcon />
-            </EditorIslandButton>
-            <EditorIslandSeparator />
-            <EditorIslandButton
-              label={t('table.merge')}
-              disabled={!canMerge}
-              disabledReason={t('table.disabled.merge')}
-              onClick={handleMerge}
-            >
-              <IslandMergeIcon />
-            </EditorIslandButton>
-            <EditorIslandButton
-              label={t('table.unmerge')}
-              disabled={!canUnmerge}
-              disabledReason={t('table.disabled.unmerge')}
-              onClick={handleUnmerge}
-            >
-              <IslandUnmergeIcon />
-            </EditorIslandButton>
-          </EditorIsland>
-          {/* 选区短提示随气泡出现，不与工具岛争位 */}
-          {selectionNote && <div className="table-editor__bubble-note">{selectionNote}</div>}
-        </div>
-      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  // 作为工具岛定位壳与选区提示的定位基准
+  // 作为工具岛定位壳的定位基准
   position: relative;
 
   // 工具岛定位壳：窄屏收纳后左右贴边。
@@ -14,32 +14,6 @@
       left: 12px;
       right: 12px;
     }
-  }
-
-  // 选区气泡：fixed 定位由 floating-ui 内联提供，
-  // 窄屏不显示（触屏上悬浮易遮挡选区）
-  &__bubble {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-
-    .drawnix--mobile & {
-      display: none;
-    }
-  }
-
-  // 挂在气泡下方的选区短提示（单格坐标 / 多格数量）
-  &__bubble-note {
-    background: var(--island-bg-color);
-    border: 1px solid var(--island-border-color);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--dx-shadow-popover);
-    padding: 3px 9px;
-    font-size: var(--dx-font-xs);
-    color: var(--dx-text-tertiary);
-    white-space: nowrap;
-    pointer-events: none;
   }
 
   &__canvas {
@@ -133,7 +107,7 @@
     user-select: none;
 
     // --selected 不承载视觉样式：选区外观由 __selection-overlay 统一绘制，
-    // 此类仅作为选区气泡/覆盖层测量的 DOM 钩子
+    // 此类仅作为覆盖层测量的 DOM 钩子
   }
 
   // 选区覆盖层：对齐选中 td 的并集矩形，WPS 式选区——

@@ -71,6 +71,8 @@ const arTranslations: Translations = {
   // General
   'general.undo': 'تراجع',
   'general.redo': 'إعادة',
+  'editor.undo.disabled': 'لا توجد تغييرات للتراجع عنها',
+  'editor.redo.disabled': 'لا توجد تغييرات لإعادتها',
   'general.menu': 'قائمة التطبيق',
   'general.moreOptions': 'خيارات إضافية',
   'general.duplicate': 'تكرار',
@@ -203,8 +205,6 @@ const arTranslations: Translations = {
   'table.disabled.col': 'يجب أن يبقى عمود واحد على الأقل',
   'table.disabled.merge': 'حدد خلايا متعددة لدمجها',
   'table.disabled.unmerge': 'لا توجد خلايا مدمجة في التحديد لإلغاء دمجها',
-  'table.selectionOne': 'تم تحديد {cell} · خلية واحدة',
-  'table.selectionMany': 'تم تحديد {count} خلايا',
 
   // Markdown editor
   'markdown.placeholder': 'اكتب Markdown هنا…',
