@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
-import { readTauriFile } from '../../data/tauri-file';
+import { getTauriDocDraft, readTauriFile } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import { useDocAutoSave } from './use-doc-auto-save';
 import {
@@ -40,7 +40,11 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
     let cancelled = false;
     setLoadFailed(false);
     setText(null);
-    readTauriFile(path, 'md')
+    // 未保存草稿优先：切换页签/异常重启后重新挂载时磁盘仍是旧内容，
+    // 有草稿说明存在未保存修改，直接以草稿恢复（与保存入口写盘的内容同源），
+    // 与白板切页签时的快照恢复机制对称
+    const draft = getTauriDocDraft(path, 'md');
+    (draft !== null ? Promise.resolve(draft) : readTauriFile(path, 'md'))
       .then((content) => {
         if (cancelled) {
           return;

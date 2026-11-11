@@ -5,6 +5,7 @@ import {
   TableFileData,
   TableCellData,
   buildEmptyTableCell,
+  getTauriDocDraft,
   parseTableFileContent,
   readTauriFile,
 } from '../../data/tauri-file';
@@ -212,7 +213,11 @@ export const TableEditor = ({ path }: { path: string }) => {
     dataRef.current = null;
     setSel(null);
     setEditing(null);
-    readTauriFile(path, 'table')
+    // 未保存草稿优先：切换页签/异常重启后重新挂载时磁盘仍是旧内容，
+    // 有草稿说明存在未保存修改，直接以草稿恢复（与保存入口写盘的内容同源），
+    // 与白板切页签时的快照恢复机制对称
+    const draft = getTauriDocDraft(path, 'table');
+    (draft !== null ? Promise.resolve(draft) : readTauriFile(path, 'table'))
       .then((content) => {
         if (cancelled) {
           return;
