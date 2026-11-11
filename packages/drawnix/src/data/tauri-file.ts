@@ -32,6 +32,20 @@ export type TauriOpenTab = {
   fileType: TauriFileType;
 };
 
+/** 页签唯一身份：同名不同类型的文件共用无扩展名路径，身份为路径+类型二元组 */
+export const getTauriTabId = (path: string, fileType: TauriFileType): string =>
+  `${path}:${fileType}`;
+
+/** 拆解页签复合身份键（dirty/草稿/保存屏蔽表的键均为「路径:类型」）；
+ *  路径段不含冒号（Windows 文件名限制），取最后一个冒号分割安全 */
+export const parseTauriTabId = (id: string): { path: string; fileType: TauriFileType } => {
+  const sep = id.lastIndexOf(':');
+  return {
+    path: id.slice(0, sep),
+    fileType: normalizeTauriFileType(id.slice(sep + 1)) ?? DEFAULT_FILE_TYPE,
+  };
+};
+
 export type TauriFileState = {
   /** 当前打开的 Tauri 文件相对路径（不含扩展名），null 表示未打开任何文件 */
   currentFile: string | null;
@@ -39,7 +53,8 @@ export type TauriFileState = {
   fileType: TauriFileType;
   /** 已打开的文件页签（内容区上方页签栏，按打开顺序） */
   openTabs: TauriOpenTab[];
-  /** 按文件记录的未保存状态：仅包含有未保存修改的文件，橙点/退出清单均从此推导 */
+  /** 按文件记录的未保存状态：仅包含有未保存修改的文件，橙点/退出清单均从此推导；
+ *  键为「路径:类型」复合身份（getTauriTabId），同名不同类型文件各自独立 */
   dirty: Record<string, true>;
 };
 
@@ -233,8 +248,10 @@ const WORKBENCH_STORAGE_KEY = 'drawnix_tauri_workbench';
 
 type PersistedWorkbenchState = {
   openTabs: TauriOpenTab[];
+  /** 活动页签身份：「路径:类型」复合键（getTauriTabId） */
   activeId: string | null;
   dirty: Record<string, true>;
+  /** 文档草稿：键为「路径:类型」复合键（仅 md/table） */
   docContents: Record<string, string>;
 };
 
@@ -264,6 +281,20 @@ const sanitizeTabs = (tabs: unknown): TauriOpenTab[] => {
   });
 };
 
+/** 旧版（页签身份为无扩展名路径）数据的键迁移：按页签补全类型升级为「路径:类型」
+ *  复合键；页签里找不到对应文件的键直接丢弃（宁可少报也不误标脏） */
+const migrateTabKey = (
+  key: string,
+  tabs: TauriOpenTab[]
+): { id: string; fileType: TauriFileType } | null => {
+  if (key.includes(':')) {
+    const fileType = normalizeTauriFileType(key.slice(key.lastIndexOf(':') + 1));
+    return fileType ? { id: key, fileType } : null;
+  }
+  const tab = tabs.find((item) => item.path === key);
+  return tab ? { id: getTauriTabId(tab.path, tab.fileType), fileType: tab.fileType } : null;
+};
+
 const loadPersistedWorkbench = (): PersistedWorkbenchState => {
   try {
     const raw = window.localStorage.getItem(WORKBENCH_STORAGE_KEY);
@@ -274,32 +305,51 @@ const loadPersistedWorkbench = (): PersistedWorkbenchState => {
     if (!parsed || typeof parsed !== 'object') {
       return { ...EMPTY_PERSISTED };
     }
-    // 旧版单一布尔脏标记迁移：旧值为 true 时把当前活动文件记为脏
-    const legacyDirty =
-      (parsed as { dirty?: unknown }).dirty === true &&
-      typeof parsed.activeId === 'string'
+    const tabs = sanitizeTabs(parsed.openTabs);
+    // 旧版单一布尔脏标记迁移：旧值为 true 时把活动文件记为脏
+    const legacyDirtySource =
+      (parsed as { dirty?: unknown }).dirty === true && typeof parsed.activeId === 'string'
         ? { [parsed.activeId]: true as const }
         : null;
-    const dirtySource = legacyDirty ?? parsed.dirty;
+    const dirtySource = legacyDirtySource ?? parsed.dirty;
     const dirty: Record<string, true> = {};
     if (dirtySource && typeof dirtySource === 'object') {
       for (const [key, value] of Object.entries(dirtySource)) {
-        if (value === true) {
-          dirty[key] = true;
+        if (value !== true) {
+          continue;
+        }
+        const migrated = migrateTabKey(key, tabs);
+        if (migrated) {
+          dirty[migrated.id] = true;
         }
       }
     }
     const docContents: Record<string, string> = {};
     if (parsed.docContents && typeof parsed.docContents === 'object') {
       for (const [key, value] of Object.entries(parsed.docContents)) {
-        if (typeof value === 'string') {
-          docContents[key] = value;
+        if (typeof value !== 'string') {
+          continue;
+        }
+        const migrated = migrateTabKey(key, tabs);
+        if (migrated && migrated.fileType !== 'drawnix') {
+          docContents[migrated.id] = value;
         }
       }
     }
+    let activeId: string | null = null;
+    if (typeof parsed.activeId === 'string') {
+      if (parsed.activeId.includes(':')) {
+        activeId = tabs.some((tab) => getTauriTabId(tab.path, tab.fileType) === parsed.activeId)
+          ? parsed.activeId
+          : null;
+      } else {
+        const tab = tabs.find((item) => item.path === parsed.activeId);
+        activeId = tab ? getTauriTabId(tab.path, tab.fileType) : null;
+      }
+    }
     return {
-      openTabs: sanitizeTabs(parsed.openTabs),
-      activeId: typeof parsed.activeId === 'string' ? parsed.activeId : null,
+      openTabs: tabs,
+      activeId,
       dirty,
       docContents,
     };
@@ -313,13 +363,19 @@ const persisted = loadPersistedWorkbench();
 /** 文档草稿缓存（Markdown/表格）：编辑中的内容，切换页签与刷新后恢复 */
 const docDrafts: Record<string, string> = { ...persisted.docContents };
 
-/** 白板内容快照：白板页签间切换时暂存未保存内容（内存级，刷新后回退磁盘版本） */
+/** 白板内容快照：白板页签间切换时暂存未保存内容（内存级，刷新后回退磁盘版本）；
+ *  键为路径——快照只存白板内容，同名文件中只有白板版会写入 */
 const boardSnapshots = new Map<string, string>();
 
-const initialTab = persisted.openTabs.find((tab) => tab.path === persisted.activeId);
+const initialTab =
+  persisted.activeId === null
+    ? null
+    : persisted.openTabs.find(
+          (tab) => getTauriTabId(tab.path, tab.fileType) === persisted.activeId
+        ) ?? null;
 
 let state: TauriFileState = {
-  currentFile: initialTab ? persisted.activeId : null,
+  currentFile: initialTab?.path ?? null,
   fileType: initialTab?.fileType ?? DEFAULT_FILE_TYPE,
   openTabs: persisted.openTabs,
   dirty: persisted.dirty,
@@ -347,7 +403,11 @@ const persistWorkbench = () => {
     try {
       const payload: PersistedWorkbenchState = {
         openTabs: state.openTabs,
-        activeId: state.currentFile,
+        // 活动页签身份为复合键：同名不同类型文件共用路径，
+        // 只存路径会让重启恢复命中第一个同名页签而非真正活动的那一个
+        activeId: state.currentFile
+          ? getTauriTabId(state.currentFile, state.fileType)
+          : null,
         dirty: state.dirty,
         docContents: docDrafts,
       };
@@ -383,40 +443,45 @@ export const setCurrentTauriFile = (
   name: string | null,
   fileType: TauriFileType = DEFAULT_FILE_TYPE
 ) => {
-  // 打开文件时解除该路径的历史保存屏蔽（如旧路径曾删除/移动后重建同名文件），
+  // 打开文件时解除该页签的历史保存屏蔽（如旧路径曾删除/移动后重建同名文件），
   // 避免残留屏蔽静默丢弃新文件的保存
   if (name) {
-    resumeTauriFileSave(name);
+    resumeTauriFileSave(name, fileType);
   }
   suppressDirtyUntil = Date.now() + 500;
-  // 维护页签列表：未打开过则追加为新页签；同名不同类型的文件共用无扩展名路径，
-  // 页签类型需跟随本次打开者，否则重启恢复时会按旧类型打开（白板被误恢复成文档编辑器）
-  const openTabs = name
-    ? state.openTabs.some((tab) => tab.path === name)
-      ? state.openTabs.map((tab) =>
-          tab.path === name ? { path: name, fileType } : tab
-        )
-      : [...state.openTabs, { path: name, fileType }]
-    : state.openTabs;
+  // 维护页签列表：未打开过则追加为新页签；同名不同类型的文件是无扩展名路径 +
+  // 类型的二元组，各自独立成页签，这里不能按路径覆盖已有页签的类型
+  const openTabs =
+    name && !state.openTabs.some((tab) => tab.path === name && tab.fileType === fileType)
+      ? [...state.openTabs, { path: name, fileType }]
+      : state.openTabs;
   setState({ currentFile: name, fileType, openTabs });
 };
 
-/** 标记文件有未保存修改；path 缺省为当前文件，白板 onChange 与文档编辑共用 */
-export const markTauriFileDirty = (path?: string) => {
+/** 标记文件有未保存修改；path/fileType 缺省为当前文件，白板 onChange 与文档编辑共用 */
+export const markTauriFileDirty = (path?: string, fileType?: TauriFileType) => {
   if (Date.now() < suppressDirtyUntil) {
     return;
   }
-  const target = path ?? state.currentFile;
-  if (!target || state.dirty[target]) {
+  const targetPath = path ?? state.currentFile;
+  if (!targetPath) {
+    return;
+  }
+  const target = getTauriTabId(targetPath, fileType ?? state.fileType);
+  if (state.dirty[target]) {
     return;
   }
   setState({ dirty: { ...state.dirty, [target]: true } });
 };
 
-/** 清除指定文件的脏标记（仅保存成功后调用）；path 缺省为当前文件 */
-export const clearTauriFileDirty = (path?: string) => {
-  const target = path ?? state.currentFile;
-  if (!target || !state.dirty[target]) {
+/** 清除指定文件的脏标记（仅保存成功后调用）；path/fileType 缺省为当前文件 */
+export const clearTauriFileDirty = (path?: string, fileType?: TauriFileType) => {
+  const targetPath = path ?? state.currentFile;
+  if (!targetPath) {
+    return;
+  }
+  const target = getTauriTabId(targetPath, fileType ?? state.fileType);
+  if (!state.dirty[target]) {
     return;
   }
   const dirty = { ...state.dirty };
@@ -425,9 +490,10 @@ export const clearTauriFileDirty = (path?: string) => {
   setState({ dirty });
 };
 
-export const isTauriFileDirty = (path: string): boolean => Boolean(state.dirty[path]);
+export const isTauriFileDirty = (path: string, fileType?: TauriFileType): boolean =>
+  Boolean(state.dirty[getTauriTabId(path, fileType ?? state.fileType)]);
 
-/** 所有有未保存修改的文件路径（退出确认清单、批量保存均从此推导） */
+/** 所有有未保存修改的页签身份（「路径:类型」复合键；退出确认清单、批量保存均从此推导） */
 export const getTauriDirtyFiles = (): string[] => Object.keys(state.dirty);
 
 export const suppressTauriDirty = (durationMs = 500) => {
@@ -436,21 +502,21 @@ export const suppressTauriDirty = (durationMs = 500) => {
 
 /**
  * 已删除/已改名/已移动文件的保存屏蔽表：文档编辑器卸载时会立即回写文件，
- * 若文件已被删除或挪走，回写会把旧文件重新创建出来，这里按路径屏蔽保存
+ * 若文件已被删除或挪走，回写会把旧文件重新创建出来，这里按页签身份屏蔽保存
  */
 const saveSuppressedPaths = new Set<string>();
 
-export const suppressTauriFileSave = (path: string) => {
-  saveSuppressedPaths.add(path);
+export const suppressTauriFileSave = (path: string, fileType?: TauriFileType) => {
+  saveSuppressedPaths.add(getTauriTabId(path, fileType ?? state.fileType));
 };
 
 /** 重新打开同名路径的文件时恢复自动保存 */
-export const resumeTauriFileSave = (path: string) => {
-  saveSuppressedPaths.delete(path);
+export const resumeTauriFileSave = (path: string, fileType?: TauriFileType) => {
+  saveSuppressedPaths.delete(getTauriTabId(path, fileType ?? state.fileType));
 };
 
-export const isTauriFileSaveSuppressed = (path: string) =>
-  saveSuppressedPaths.has(path);
+export const isTauriFileSaveSuppressed = (path: string, fileType?: TauriFileType) =>
+  saveSuppressedPaths.has(getTauriTabId(path, fileType ?? state.fileType));
 
 export const buildEmptyDrawnixContent = (): string => {
   return JSON.stringify(
@@ -562,13 +628,13 @@ export const saveToTauriFile = async (board: PlaitBoard, path?: string): Promise
     throw new Error('no tauri file opened');
   }
   // 文件已被删除/移动/重命名（旧路径保存被屏蔽）时跳过回写，
-  // 避免把旧文件在旧位置重新创建出来
-  if (isTauriFileSaveSuppressed(filePath)) {
+  // 避免把旧文件在旧位置重新创建出来；白板保存固定按 drawnix 身份查询
+  if (isTauriFileSaveSuppressed(filePath, 'drawnix')) {
     return filePath;
   }
   await writeTauriFile(filePath, serializeAsJSON(board), 'drawnix');
   boardSnapshots.delete(filePath);
-  clearTauriFileDirty(filePath);
+  clearTauriFileDirty(filePath, 'drawnix');
   return filePath;
 };
 
@@ -581,86 +647,105 @@ export const saveTauriDocFile = async (
   content: string,
   fileType: 'md' | 'table'
 ): Promise<void> => {
-  if (isTauriFileSaveSuppressed(path)) {
+  if (isTauriFileSaveSuppressed(path, fileType)) {
     return;
   }
   await writeTauriFile(path, content, fileType);
-  delete docDrafts[path];
-  clearTauriFileDirty(path);
+  delete docDrafts[getTauriTabId(path, fileType)];
+  clearTauriFileDirty(path, fileType);
 };
 
-/** 收起页签：清除该文件的未保存痕迹；收起活动页签时切到相邻页签或欢迎页 */
-export const closeTauriTab = (path: string): string | null => {
-  const index = state.openTabs.findIndex((tab) => tab.path === path);
+/** 收起页签：清除该文件的未保存痕迹；收起活动页签时切到相邻页签或欢迎页。
+ *  返回收起后应成为活动页签的页签（null 表示回到欢迎页） */
+export const closeTauriTab = (path: string, fileType: TauriFileType): TauriOpenTab | null => {
+  const index = state.openTabs.findIndex(
+    (tab) => tab.path === path && tab.fileType === fileType
+  );
   if (index < 0) {
-    return state.currentFile;
+    return null;
   }
-  const openTabs = state.openTabs.filter((tab) => tab.path !== path);
-  const wasActive = state.currentFile === path;
-  let currentFile = state.currentFile;
-  let fileType = state.fileType;
-  if (wasActive) {
-    const nextTab = openTabs[Math.min(index, openTabs.length - 1)] ?? null;
-    currentFile = nextTab?.path ?? null;
-    fileType = nextTab?.fileType ?? DEFAULT_FILE_TYPE;
-  }
+  const openTabs = state.openTabs.filter(
+    (tab) => !(tab.path === path && tab.fileType === fileType)
+  );
+  const wasActive = state.currentFile === path && state.fileType === fileType;
+  const nextTab = openTabs[Math.min(index, openTabs.length - 1)] ?? null;
   const dirty = { ...state.dirty };
-  delete dirty[path];
-  delete docDrafts[path];
+  delete dirty[getTauriTabId(path, fileType)];
+  delete docDrafts[getTauriTabId(path, fileType)];
+  // 快照只存白板内容，同名文件中只有白板版会写入，按路径清理即可
   boardSnapshots.delete(path);
-  setState({ openTabs, currentFile, fileType, dirty });
-  if (wasActive && currentFile) {
+  setState({
+    openTabs,
+    currentFile: wasActive ? nextTab?.path ?? null : state.currentFile,
+    fileType: wasActive ? nextTab?.fileType ?? DEFAULT_FILE_TYPE : state.fileType,
+    dirty,
+  });
+  if (wasActive && nextTab) {
     suppressDirtyUntil = Date.now() + 500;
   }
-  return currentFile;
+  return nextTab;
 };
 
-/** 文件路径变化（重命名/移动）后同步页签、脏标记、草稿与快照 */
-export const renameTauriTabPath = (from: string, to: string, fileType?: TauriFileType) => {
+/** 文件路径变化（重命名/移动）后同步页签、脏标记、草稿、快照与保存屏蔽；
+ *  同名不同类型文件路径相同，fileType 必传以精确定位目标页签 */
+export const renameTauriTabPath = (from: string, to: string, fileType: TauriFileType) => {
   if (from === to) {
     return;
   }
+  const fromId = getTauriTabId(from, fileType);
+  const toId = getTauriTabId(to, fileType);
   const dirty = { ...state.dirty };
-  if (dirty[from]) {
-    delete dirty[from];
-    dirty[to] = true;
+  if (dirty[fromId]) {
+    delete dirty[fromId];
+    dirty[toId] = true;
   }
   const openTabs = state.openTabs.map((tab) =>
-    tab.path === from ? { path: to, fileType: fileType ?? tab.fileType } : tab
+    tab.path === from && tab.fileType === fileType ? { path: to, fileType } : tab
   );
-  if (Object.prototype.hasOwnProperty.call(docDrafts, from)) {
-    docDrafts[to] = docDrafts[from];
-    delete docDrafts[from];
+  if (Object.prototype.hasOwnProperty.call(docDrafts, fromId)) {
+    docDrafts[toId] = docDrafts[fromId];
+    delete docDrafts[fromId];
   }
   const snapshot = boardSnapshots.get(from);
   if (snapshot !== undefined) {
     boardSnapshots.set(to, snapshot);
     boardSnapshots.delete(from);
   }
-  if (saveSuppressedPaths.has(from)) {
-    saveSuppressedPaths.delete(from);
-    saveSuppressedPaths.add(to);
+  // 旧路径的保存屏蔽保持原样：panel 在重命名/移动前已按旧路径屏蔽（防旧编辑器
+  // 卸载回写在旧位置复活文件），屏蔽绑定路径本身而非页签，不能搬到新路径；
+  // 新路径的可用性由下方 resume 保证
+  const isCurrent = state.currentFile === from && state.fileType === fileType;
+  setState({
+    openTabs,
+    dirty,
+    currentFile: isCurrent ? to : state.currentFile,
+    fileType: state.fileType,
+  });
+  // 路径变化等价于在新路径上重新打开：解除新路径的历史屏蔽（如曾删除后重建），
+  // 保证重命名/移动后的文件可以继续保存
+  resumeTauriFileSave(to, fileType);
+  if (isCurrent) {
+    // 路径变化会让文档编辑器按新路径重挂载，抑制重挂载期间的误标脏
+    suppressDirtyUntil = Date.now() + 500;
   }
-  const currentFile = state.currentFile === from ? to : state.currentFile;
-  const nextType =
-    currentFile === to ? fileType ?? state.fileType : state.fileType;
-  setState({ openTabs, dirty, currentFile, fileType: nextType });
 };
 
 // ---- 文档草稿与白板快照存取（编辑器加载/切换页签时使用） ----
 
-export const getTauriDocDraft = (path: string): string | null => {
-  return Object.prototype.hasOwnProperty.call(docDrafts, path) ? docDrafts[path] : null;
+export const getTauriDocDraft = (path: string, fileType: 'md' | 'table'): string | null => {
+  const key = getTauriTabId(path, fileType);
+  return Object.prototype.hasOwnProperty.call(docDrafts, key) ? docDrafts[key] : null;
 };
 
-export const setTauriDocDraft = (path: string, content: string) => {
-  docDrafts[path] = content;
+export const setTauriDocDraft = (path: string, fileType: 'md' | 'table', content: string) => {
+  docDrafts[getTauriTabId(path, fileType)] = content;
   persistWorkbench();
 };
 
-export const clearTauriDocDraft = (path: string) => {
-  if (Object.prototype.hasOwnProperty.call(docDrafts, path)) {
-    delete docDrafts[path];
+export const clearTauriDocDraft = (path: string, fileType: 'md' | 'table') => {
+  const key = getTauriTabId(path, fileType);
+  if (Object.prototype.hasOwnProperty.call(docDrafts, key)) {
+    delete docDrafts[key];
     persistWorkbench();
   }
 };
@@ -681,37 +766,41 @@ export const setTauriBoardSnapshot = (path: string, content: string) => {
 export const flushAllTauriDirtyFiles = async (
   getCurrentBoardContent?: () => string | null
 ): Promise<void> => {
-  const dirtyPaths = Object.keys(state.dirty);
+  const dirtyIds = Object.keys(state.dirty);
   const succeeded = new Set<string>();
-  for (const path of dirtyPaths) {
+  for (const id of dirtyIds) {
+    const { path, fileType } = parseTauriTabId(id);
     try {
-      const tab = state.openTabs.find((item) => item.path === path);
-      const fileType = tab?.fileType;
       if (fileType === 'md' || fileType === 'table') {
-        const draft = docDrafts[path];
+        const draft = docDrafts[id];
         if (draft !== undefined) {
           await writeTauriFile(path, draft, fileType);
         }
       } else {
+        const isCurrentBoard =
+          path === state.currentFile && fileType === state.fileType;
         const snapshot =
-          path === state.currentFile && getCurrentBoardContent
+          isCurrentBoard && getCurrentBoardContent
             ? getCurrentBoardContent()
             : boardSnapshots.get(path);
         if (snapshot) {
           await writeTauriFile(path, snapshot, 'drawnix');
         }
       }
-      succeeded.add(path);
+      succeeded.add(id);
     } catch (error) {
       console.error('Failed to save file before exit:', path, error);
     }
   }
   if (succeeded.size > 0) {
     const dirty = { ...state.dirty };
-    for (const path of succeeded) {
-      delete dirty[path];
-      delete docDrafts[path];
-      boardSnapshots.delete(path);
+    for (const id of succeeded) {
+      const { path, fileType } = parseTauriTabId(id);
+      delete dirty[id];
+      delete docDrafts[id];
+      if (fileType === 'drawnix') {
+        boardSnapshots.delete(path);
+      }
     }
     setState({ dirty });
   }

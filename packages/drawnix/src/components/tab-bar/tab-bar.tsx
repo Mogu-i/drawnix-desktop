@@ -13,6 +13,7 @@ import {
 } from '../../data/workbench-ui';
 import {
   closeTauriTab,
+  getTauriTabId,
   isTauriEnvironment,
   useTauriFileState,
   type TauriOpenTab,
@@ -43,7 +44,7 @@ const tabTypeLabelKey = {
 export const TabBar = () => {
   const { appState, setAppState } = useDrawnix();
   const { t } = useI18n();
-  const { currentFile, openTabs, dirty } = useTauriFileState();
+  const { currentFile, fileType, openTabs, dirty } = useTauriFileState();
   const { openFile, saveCurrentFile } = useTauriFileActions();
   const [isTauri] = useState(() => isTauriEnvironment());
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -65,7 +66,8 @@ export const TabBar = () => {
 
   const ensureActiveVisible = useCallback(() => {
     const scroller = scrollRef.current;
-    const active = currentFile ? tabRefs.current.get(currentFile) : null;
+    const activeId = currentFile ? getTauriTabId(currentFile, fileType) : null;
+    const active = activeId ? tabRefs.current.get(activeId) : null;
     if (!scroller || !active) {
       return;
     }
@@ -79,7 +81,7 @@ export const TabBar = () => {
         behavior: 'smooth',
       });
     }
-  }, [currentFile]);
+  }, [currentFile, fileType]);
 
   useEffect(() => {
     updateScrollIndicators();
@@ -119,7 +121,8 @@ export const TabBar = () => {
 
   // ---- 页签切换（收起文件已保存，白板切换由 openFile 处理快照） ---
   const switchTab = (tab: TauriOpenTab) => {
-    if (tab.path === currentFile) {
+    // 同名不同类型的文件共用路径，页签身份需连同类型一起比较
+    if (tab.path === currentFile && tab.fileType === fileType) {
       return;
     }
     void openFile(tab.path, tab.fileType);
@@ -130,19 +133,17 @@ export const TabBar = () => {
     if (!currentFile) {
       return;
     }
-    if (dirty[currentFile]) {
+    const activeId = getTauriTabId(currentFile, fileType);
+    if (dirty[activeId]) {
       const saved = await saveCurrentFile();
       if (!saved) {
         return;
       }
     }
-    const next = closeTauriTab(currentFile);
-    if (next) {
+    const nextTab = closeTauriTab(currentFile, fileType);
+    if (nextTab) {
       // closeTauriTab 同步更新了 currentFile，openFile 不会再误存被收起文件的快照
-      const nextTab = openTabs.find((tab) => tab.path === next);
-      if (nextTab) {
-        void openFile(next, nextTab.fileType);
-      }
+      void openFile(nextTab.path, nextTab.fileType);
     } else if (appState.isContentFullscreen) {
       // 收起唯一页签回到欢迎页时顺带退出专注模式
       setAppState((current) => ({ ...current, isContentFullscreen: false }));
@@ -180,17 +181,19 @@ export const TabBar = () => {
         >
           {openTabs.map((tab) => {
             const name = lastSeg(tab.path);
-            const isActive = tab.path === currentFile;
-            const isDirty = Boolean(dirty[tab.path]);
+            const tabId = getTauriTabId(tab.path, tab.fileType);
+            // 同名不同类型的文件共用路径，活动/脏状态均按页签身份判断
+            const isActive = tab.path === currentFile && tab.fileType === fileType;
+            const isDirty = Boolean(dirty[tabId]);
             const label = t(tabTypeLabelKey[tab.fileType]);
             return (
               <div
-                key={tab.path}
+                key={tabId}
                 ref={(node) => {
                   if (node) {
-                    tabRefs.current.set(tab.path, node);
+                    tabRefs.current.set(tabId, node);
                   } else {
-                    tabRefs.current.delete(tab.path);
+                    tabRefs.current.delete(tabId);
                   }
                 }}
                 className={classNames('tab-bar__tab', {

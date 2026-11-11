@@ -57,7 +57,11 @@ export const useTauriFileActions = () => {
     async (path: string, ext: string): Promise<boolean> => {
       const fileType = normalizeTauriFileType(ext) ?? 'drawnix';
       const state = getTauriFileState();
-      if (state.currentFile && state.currentFile !== path && state.fileType === 'drawnix') {
+      // 同名不同类型的文件共用路径，页签身份不同也要存快照，
+      // 否则白板与它的同名文档互切时未保存内容会丢
+      const isSameTab =
+        state.currentFile === path && state.fileType === fileType;
+      if (state.currentFile && !isSameTab && state.fileType === 'drawnix') {
         // 未保存的白板内容暂存快照，切回来时优先恢复
         setTauriBoardSnapshot(state.currentFile, serializeAsJSON(board));
       }
@@ -98,7 +102,7 @@ export const useTauriFileActions = () => {
       fileType === 'drawnix'
         ? saveToTauriFile(board, path)
         : Promise.resolve().then(() => {
-            const draft = getTauriDocDraft(path);
+            const draft = getTauriDocDraft(path, fileType);
             if (draft !== null) {
               return saveTauriDocFile(path, draft, fileType);
             }

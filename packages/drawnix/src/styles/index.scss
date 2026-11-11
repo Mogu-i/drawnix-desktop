@@ -26,7 +26,11 @@
         position: relative;
         flex: 1 1 auto;
         min-width: 0;
-        height: 100%;
+        // 不设 height:100%：wb-content 是列 flex（页签栏 + 内容区），
+        // 固定 100% 会把页签栏高度叠到内容区上，底部溢出视口
+        // （右下角主题选择器被裁剪、原生下拉弹出窗外即此因）；
+        // 用 min-height:0 允许收缩到 flex 分配的剩余高度
+        min-height: 0;
     }
     .pencil-mode-toolbar {
         position: absolute;
@@ -108,26 +112,13 @@
         @include isMobile {
             display: none;
         }
-        select {
+        // 原生 select 换为浮层 Select：触发按钮视觉对齐原 select
+        // （背景/边框/圆角/hover/focus 由 dx-SelectTrigger 自带），
+        // 下拉由 Floating UI 定位自动翻转，不再弹出窗外
+        .theme-toolbar__trigger {
             width: 108px;
             height: var(--control-height);
-            background-color: var(--island-bg-color);
-            color: var(--color-on-surface);
-            border: 1px solid var(--island-border-color);
-            border-radius: var(--border-radius-md);
-            box-shadow: var(--shadow-island);
-            padding: 0 10px;
-            cursor: pointer;
-            outline: none;
             font-size: var(--dx-font-sm);
-            transition: border-color var(--dx-duration-fast) var(--dx-ease);
-            &:hover {
-                border-color: var(--dx-border-strong);
-            }
-            &:focus-visible {
-                border-color: var(--color-primary);
-                box-shadow: 0 0 0 2px var(--focus-highlight-color);
-            }
         }
     }
     .drawnix-link, a {

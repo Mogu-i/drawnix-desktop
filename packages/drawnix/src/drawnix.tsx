@@ -318,14 +318,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             options={options}
             plugins={plugins}
             onChange={(data: BoardChangeData) => {
-              // 仅元素内容变化才标脏：框选/滚动/主题切换等也会触发 onChange，
-              // 不加区分会把未编辑的文件误标为有未保存修改（假脏橙点、
-              // 切换文件时触发无谓写盘，重启后还可能残留误导性的未保存状态）
+              // 仅元素内容变化才标脏：框选/滚动等也会触发 onChange，不加区分会把
+              // 未编辑的文件误标为有未保存修改（假脏橙点、切换文件时无谓写盘）；
+              // 主题切换不算在内——theme 会随 serializeAsJSON 写入文件，属于内容变化
               const hasContentChange = data.operations.some(
                 (op) =>
                   !PlaitOperation.isSetSelectionOperation(op) &&
-                  !PlaitOperation.isSetViewportOperation(op) &&
-                  !PlaitOperation.isSetThemeOperation(op)
+                  !PlaitOperation.isSetViewportOperation(op)
               );
               if (hasContentChange) {
                 markTauriFileDirty();

@@ -14,6 +14,7 @@ import {
  */
 export const useDocAutoSave = (
   path: string,
+  fileType: 'md' | 'table',
   serialize: () => string | null
 ) => {
   // 内容是否已成功加载；未加载前禁止写草稿，避免用空内容覆盖
@@ -24,29 +25,29 @@ export const useDocAutoSave = (
       return;
     }
     // 文件已被删除/改名/移动时禁止回写，避免把旧文件重新创建出来
-    if (isTauriFileSaveSuppressed(path)) {
+    if (isTauriFileSaveSuppressed(path, fileType)) {
       return;
     }
     const content = serialize();
     if (content !== null) {
-      setTauriDocDraft(path, content);
+      setTauriDocDraft(path, fileType, content);
     }
-  }, [path, serialize]);
+  }, [path, fileType, serialize]);
 
   const scheduleSave = useCallback(() => {
     // 被屏蔽的路径（删除/移动中）不标脏也不写草稿
-    if (isTauriFileSaveSuppressed(path)) {
+    if (isTauriFileSaveSuppressed(path, fileType)) {
       return;
     }
-    markTauriFileDirty(path);
+    markTauriFileDirty(path, fileType);
     flushDraft();
-  }, [flushDraft, path]);
+  }, [flushDraft, path, fileType]);
 
   const markLoaded = useCallback(() => {
     // 重新打开同名路径的文件（如删除后重建）时恢复自动保存
-    resumeTauriFileSave(path);
+    resumeTauriFileSave(path, fileType);
     loadedRef.current = true;
-  }, [path]);
+  }, [path, fileType]);
 
   // 卸载（关闭/切换文件）时立即写入草稿，保证未保存修改不丢
   useEffect(() => {

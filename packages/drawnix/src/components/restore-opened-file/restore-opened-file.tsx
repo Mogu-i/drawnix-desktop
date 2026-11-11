@@ -28,7 +28,7 @@ export const RestoreOpenedFile = () => {
       // 加载的是磁盘最新版：异常退出遗留的脏标记已无对应的未保存内容，一并清除，
       // 避免用户面对一个与磁盘一致却带橙点的画布
       if (restored) {
-        clearTauriFileDirty(currentFile);
+        clearTauriFileDirty(currentFile, fileType);
       }
     });
   }, [currentFile, fileType, openFile]);

@@ -113,7 +113,7 @@ export const FileRefCardContent: React.FC<{ element: CardElement }> = ({ element
     }
     // 文件已被删除/移动/重命名（旧路径保存被屏蔽）时不再回写，
     // 避免把旧文件在旧位置重新创建出来；回滚勾选状态，等待卡片按新路径重载
-    if (isTauriFileSaveSuppressed(filePath)) {
+    if (isTauriFileSaveSuppressed(filePath, fileType)) {
       target.checked = !target.checked;
       return;
     }

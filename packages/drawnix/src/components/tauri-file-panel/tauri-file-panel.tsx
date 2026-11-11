@@ -38,6 +38,7 @@ import {
   deleteTauriFile,
   deleteTauriFolder,
   emptyTauriTrash,
+  getTauriTabId,
   isTauriEnvironment,
   listTauriTrashFiles,
   listTauriTree,
@@ -49,6 +50,7 @@ import {
   readTauriFile,
   renameTauriFile,
   renameTauriFolder,
+  renameTauriTabPath,
   reorderTauriItems,
   resumeTauriFileSave,
   restoreTauriFile,
@@ -368,15 +370,27 @@ export const TauriFilePanel = () => {
     return prefix && currentFile.startsWith(`${from}/`) ? currentFile : null;
   };
 
-  /** 移动/重命名成功后把当前文档切换到新路径 */
+  /** 移动/重命名成功后把当前文档切换到新路径：
+   *  同步页签、脏标记、草稿、快照与保存屏蔽（同名不同类型文件按类型精确定位） */
   const retargetCurrentDoc = (newPath: string) => {
-    setCurrentTauriFile(newPath, currentFileType);
+    if (!currentFile) {
+      return;
+    }
+    renameTauriTabPath(currentFile, newPath, currentFileType);
   };
 
   // 当前文件有未保存修改时先自动保存，
-  // 避免后续加载其他文件（打开/导出图片）覆盖丢失编辑
+  // 避免后续加载其他文件（打开/导出图片）覆盖丢失编辑。
+  // 仅白板文件在此保存：文档未落盘内容在草稿中，由文档编辑器卸载时自动写回，
+  // 这里若误写会把白板内容写进文档文件
   const ensureCurrentFileSaved = async (): Promise<boolean> => {
-    if (!dirty || !currentFile) {
+    const dirtyId = currentFile ? getTauriTabId(currentFile, currentFileType) : null;
+    if (
+      !currentFile ||
+      !dirtyId ||
+      !dirty[dirtyId] ||
+      currentFileType !== 'drawnix'
+    ) {
       return true;
     }
     try {
@@ -424,7 +438,7 @@ export const TauriFilePanel = () => {
         setCurrentTauriFile(path, 'table');
       } else {
         await writeTauriFile(path, buildEmptyDrawnixContent());
-        setCurrentTauriFile(path);
+        setCurrentTauriFile(path, 'drawnix');
         clearAndLoad([]);
       }
       // 创建成功后展开所属文件夹，让新文件立即可见（C8）
@@ -474,7 +488,7 @@ export const TauriFilePanel = () => {
       if (currentFile !== filePath) {
         const content = await readTauriFile(filePath);
         const { elements, viewport, theme } = parseTauriFileContent(content);
-        setCurrentTauriFile(filePath);
+        setCurrentTauriFile(filePath, 'drawnix');
         clearAndLoad(elements as PlaitElement[], viewport, theme);
       }
       if (format === 'svg') {
@@ -501,7 +515,7 @@ export const TauriFilePanel = () => {
       // 当前打开的文档被删除时先屏蔽其自动保存，
       // 否则文档编辑器卸载时的回写会把刚删除的文件重新创建出来
       if (isCurrentDoc) {
-        suppressTauriFileSave(target.path);
+        suppressTauriFileSave(target.path, asFileType(target.ext));
       }
       await deleteTauriFile(target.path, asFileType(target.ext));
       if (isCurrentDoc) {
@@ -515,7 +529,7 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 删除失败：恢复被屏蔽的自动保存，避免编辑器后续修改丢失
       if (isCurrentDoc) {
-        resumeTauriFileSave(target.path);
+        resumeTauriFileSave(target.path, asFileType(target.ext));
       }
       console.error('Failed to delete file:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -535,7 +549,7 @@ export const TauriFilePanel = () => {
         currentFile &&
         (currentFile === path || currentFile.startsWith(`${path}/`))
       ) {
-        suppressTauriFileSave(currentFile);
+        suppressTauriFileSave(currentFile, currentFileType);
         setCurrentTauriFile(null);
         clearAndLoad([]);
       }
@@ -547,7 +561,7 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 删除失败：恢复被屏蔽的自动保存
       if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
-        resumeTauriFileSave(currentFile);
+        resumeTauriFileSave(currentFile, currentFileType);
       }
       console.error('Failed to delete folder:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -568,7 +582,7 @@ export const TauriFilePanel = () => {
         ? matchCurrentDoc(target.path, false, asFileType(target.ext))
         : matchCurrentDoc(target.path, true);
     if (docOldPath) {
-      suppressTauriFileSave(docOldPath);
+      suppressTauriFileSave(docOldPath, currentFileType);
     }
     try {
       if (target.kind === 'file') {
@@ -594,7 +608,7 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 移动失败：恢复被屏蔽的自动保存
       if (docOldPath) {
-        resumeTauriFileSave(docOldPath);
+        resumeTauriFileSave(docOldPath, currentFileType);
       }
       console.error('Failed to move entry:', error);
       showErrorToast(t('toast.tauriFile.saveFailed'));
@@ -670,7 +684,7 @@ export const TauriFilePanel = () => {
     // 分组内包含当前打开的文档时，先屏蔽旧路径的自动保存回写
     const docOldPath = matchCurrentDoc(dirPath, true);
     if (docOldPath) {
-      suppressTauriFileSave(docOldPath);
+      suppressTauriFileSave(docOldPath, currentFileType);
     }
     try {
       await renameTauriFolder(dirPath, name);
@@ -686,7 +700,7 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 重命名失败：恢复被屏蔽的自动保存
       if (docOldPath) {
-        resumeTauriFileSave(docOldPath);
+        resumeTauriFileSave(docOldPath, currentFileType);
       }
       console.error('Failed to rename folder:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));
@@ -707,7 +721,7 @@ export const TauriFilePanel = () => {
     // 同名不同类型文件路径相同，判别当前文档需连同文件类型
     const isCurrentDoc = currentFile === oldPath && currentFileType === asFileType(ext);
     if (isCurrentDoc) {
-      suppressTauriFileSave(oldPath);
+      suppressTauriFileSave(oldPath, asFileType(ext));
     }
     try {
       await renameTauriFile(oldPath, newName, asFileType(ext));
@@ -721,7 +735,7 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 重命名失败：恢复被屏蔽的自动保存
       if (isCurrentDoc) {
-        resumeTauriFileSave(oldPath);
+        resumeTauriFileSave(oldPath, asFileType(ext));
       }
       console.error('Failed to rename file:', error);
       showErrorToast(t('toast.tauriFile.renameFailed'));

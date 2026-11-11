@@ -217,7 +217,7 @@ export const TableEditor = ({ path }: { path: string }) => {
     []
   );
 
-  const { scheduleSave, markLoaded } = useDocAutoSave(path, serialize);
+  const { scheduleSave, markLoaded } = useDocAutoSave(path, 'table', serialize);
 
   useEffect(() => {
     let cancelled = false;

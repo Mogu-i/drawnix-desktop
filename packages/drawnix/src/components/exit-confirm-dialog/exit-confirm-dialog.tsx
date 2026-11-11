@@ -6,6 +6,7 @@ import { formatTemplate } from '../../i18n/format';
 import type { Translations } from '../../i18n/types';
 import {
   flushAllTauriDirtyFiles,
+  parseTauriTabId,
   useTauriFileState,
   type TauriFileType,
 } from '../../data/tauri-file';
@@ -27,21 +28,22 @@ const fileTypeLabelKey: Record<TauriFileType, keyof Translations> = {
  */
 export const ExitConfirmDialog = ({ container }: { container: HTMLElement | null }) => {
   const { exitConfirmOpen } = useWorkbenchUi();
-  const { openTabs, dirty } = useTauriFileState();
+  const { dirty } = useTauriFileState();
   const { t } = useI18n();
   const board = useBoard();
 
   const dirtyEntries = useMemo(
     () =>
-      Object.keys(dirty).map((path) => {
-        const tab = openTabs.find((item) => item.path === path);
+      // dirty 键为「路径:类型」复合身份，同名不同类型文件各自成条目
+      Object.keys(dirty).map((id) => {
+        const { path, fileType } = parseTauriTabId(id);
         return {
-          path,
+          id,
           name: path.slice(path.lastIndexOf('/') + 1),
-          fileType: tab?.fileType ?? 'drawnix',
+          fileType,
         };
       }),
-    [dirty, openTabs]
+    [dirty]
   );
 
   const handleConfirmExit = async () => {
@@ -66,7 +68,7 @@ export const ExitConfirmDialog = ({ container }: { container: HTMLElement | null
         {dirtyEntries.length > 0 && (
           <ul className="exit-confirm__list">
             {dirtyEntries.map((entry) => (
-              <li key={entry.path} className="exit-confirm__item">
+              <li key={entry.id} className="exit-confirm__item">
                 <span className="exit-confirm__dot" aria-hidden="true"></span>
                 <span className="exit-confirm__name">{entry.name}</span>
                 <span className="exit-confirm__type">
