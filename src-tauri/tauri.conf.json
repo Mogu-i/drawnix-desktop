@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Sihua",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "identifier": "sihua",
   "build": {
     "frontendDist": "../dist/apps/web",
