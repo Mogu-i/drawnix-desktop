@@ -94,6 +94,10 @@ const enTranslations: Translations = {
   'toast.tauriFile.restoreFailed': 'Restore failed',
   'toast.tauriFile.createFolderFailed':
     'Failed to create folder. A folder with the same name may already exist',
+  'toast.tauriFile.draftRestored': 'Restored your unsaved edits',
+  'toast.tauriFile.draftCorrupted': 'Draft could not be read; loaded the version from disk',
+  'toast.imageUnsupported': 'Unsupported image format. Cannot paste the image',
+  'toast.imageFetchFallback': 'Could not fetch the web image; pasted as text instead',
   // Language
   'language.switcher': 'Language',
   'language.chinese': '中文',
@@ -204,6 +208,11 @@ const enTranslations: Translations = {
   'table.disabled.col': 'At least one column must remain',
   'table.disabled.merge': 'Select multiple cells to merge them',
   'table.disabled.unmerge': 'No merged cells in the selection to unmerge',
+  'table.copySuccess': 'Copied',
+  'table.paste.mergeConflict': 'Cannot paste into a region containing merged cells',
+  'table.paste.mergeIgnored': 'Merged cells in the source were pasted as plain text',
+  'table.paste.empty': 'No pasteable table content in the clipboard',
+  'table.imeProxy': 'Table input proxy',
 
   // Markdown editor
   'markdown.placeholder': 'Type Markdown here…',
@@ -304,14 +313,16 @@ const enTranslations: Translations = {
   'workbench.panel.newMore': 'Choose what to create',
   'workbench.panel.folderItems': '{count} items',
   'workbench.create.nameEmpty': 'Please enter a file name',
-  'workbench.create.nameDuplicate': 'A file with this name already exists. Please choose another one.',
+  'workbench.create.nameDuplicate':
+    'A file with this name already exists. Please choose another one.',
   'workbench.create.folderLocation': 'Folder',
   'workbench.save.success': 'Saved "{name}" to local file',
   'workbench.save.noFile': 'Open a file first',
   'workbench.exit.title': 'Exit Drawnix',
   'workbench.exit.dirtyDescription':
     '{count} files still have unsaved changes. Your content stays on this device, and you can continue editing after reopening.',
-  'workbench.exit.cleanDescription': 'All files are saved. You can reopen and continue editing anytime.',
+  'workbench.exit.cleanDescription':
+    'All files are saved. You can reopen and continue editing anytime.',
   'workbench.exit.cancel': 'Cancel',
   'workbench.exit.confirm': 'Exit',
 

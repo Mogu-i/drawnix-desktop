@@ -95,6 +95,10 @@ const viTranslations: Translations = {
   'toast.tauriFile.restoreFailed': 'Khôi phục thất bại',
   'toast.tauriFile.createFolderFailed':
     'Không thể tạo thư mục, có thể đã tồn tại thư mục trùng tên',
+  'toast.tauriFile.draftRestored': 'Đã khôi phục các chỉnh sửa chưa lưu',
+  'toast.tauriFile.draftCorrupted': 'Không thể đọc bản nháp; đã tải phiên bản trên đĩa',
+  'toast.imageUnsupported': 'Định dạng ảnh không được hỗ trợ, không thể dán',
+  'toast.imageFetchFallback': 'Không thể tải ảnh từ trang web; đã dán dưới dạng văn bản',
   // Language
   'language.switcher': 'Ngôn ngữ',
   'language.chinese': '中文',
@@ -206,6 +210,11 @@ const viTranslations: Translations = {
   'table.disabled.col': 'Phải còn ít nhất một cột',
   'table.disabled.merge': 'Chọn nhiều ô để gộp chúng',
   'table.disabled.unmerge': 'Không có ô đã gộp nào trong vùng chọn để bỏ gộp',
+  'table.copySuccess': 'Đã sao chép',
+  'table.paste.mergeConflict': 'Không thể dán vào vùng có ô đã gộp',
+  'table.paste.mergeIgnored': 'Ô đã gộp trong nguồn được dán dưới dạng văn bản thuần',
+  'table.paste.empty': 'Không có nội dung bảng để dán trong clipboard',
+  'table.imeProxy': 'Proxy nhập của bảng',
 
   // Markdown editor
   'markdown.placeholder': 'Nhập Markdown tại đây…',
@@ -229,7 +238,8 @@ const viTranslations: Translations = {
   'markdown.toolbar.image': 'Hình ảnh',
   'markdown.toolbar.table': 'Bảng',
   'markdown.toolbar.horizontalRule': 'Đường phân cách',
-  'markdown.tableTemplate': '| Tiêu đề 1 | Tiêu đề 2 | Tiêu đề 3 |\n| --- | --- | --- |\n|  |  |  |',
+  'markdown.tableTemplate':
+    '| Tiêu đề 1 | Tiêu đề 2 | Tiêu đề 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'chữ liên kết',
   'markdown.imagePlaceholder': 'mô tả hình ảnh',
 
@@ -313,7 +323,8 @@ const viTranslations: Translations = {
   'workbench.exit.title': 'Thoát',
   'workbench.exit.dirtyDescription':
     '{count} tệp vẫn còn thay đổi chưa lưu. Nội dung vẫn được giữ trên máy này, bạn có thể tiếp tục chỉnh sửa sau khi mở lại.',
-  'workbench.exit.cleanDescription': 'Tất cả tệp đã được lưu, bạn có thể mở lại và tiếp tục chỉnh sửa bất cứ lúc nào.',
+  'workbench.exit.cleanDescription':
+    'Tất cả tệp đã được lưu, bạn có thể mở lại và tiếp tục chỉnh sửa bất cứ lúc nào.',
   'workbench.exit.cancel': 'Hủy',
   'workbench.exit.confirm': 'Thoát',
 

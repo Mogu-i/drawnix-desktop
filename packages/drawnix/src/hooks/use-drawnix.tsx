@@ -12,6 +12,7 @@ import { LinkElement } from '@plait/common';
 import { DEFAULT_FREEHAND_PRESETS, FreehandDrawOptions } from '../plugins/freehand/presets';
 import { DrawnixFileHandle } from '../data/json';
 import type { DrawnixToastOptions } from '../components/toast/toast';
+import type { Translations } from '../i18n/types';
 
 export enum DialogType {
   mermaidToDrawnix = 'mermaidToDrawnix',
@@ -60,6 +61,9 @@ export const mergeToolState = (toolState?: Partial<DrawnixToolState>): DrawnixTo
 export interface DrawnixBoard extends PlaitBoard {
   appState: DrawnixState;
   showToast?: (toast: DrawnixToastOptions) => void;
+  // 插件链路（react-board 等非 React 环境）的 i18n 文案通道，
+  // 由 Drawnix 组件注入：随当前语言动态解析（WeakMap boardLanguageMap）
+  t?: (key: keyof Translations) => string;
 }
 
 export type LinkState = {

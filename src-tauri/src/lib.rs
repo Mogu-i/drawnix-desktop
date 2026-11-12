@@ -38,12 +38,24 @@ struct AppSettings {
   trash_retention_days: Option<u32>,
 }
 
-fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+/// 数据根目录：dev 构建统一落到 app_data_dir/dev，
+/// 避免开发时读写正式安装版的 settings.json 与真实工作目录
+fn data_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   app
     .path()
     .app_data_dir()
-    .map(|dir| dir.join("settings.json"))
+    .map(|dir| {
+      if tauri::is_dev() {
+        dir.join("dev")
+      } else {
+        dir
+      }
+    })
     .map_err(|e| e.to_string())
+}
+
+fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+  data_root(app).map(|dir| dir.join("settings.json"))
 }
 
 fn load_settings(app: &tauri::AppHandle) -> AppSettings {
@@ -80,11 +92,7 @@ fn trash_retention_days(app: &tauri::AppHandle) -> u32 {
 }
 
 fn default_files_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  app
-    .path()
-    .app_data_dir()
-    .map(|dir| dir.join("files"))
-    .map_err(|e| e.to_string())
+  data_root(app).map(|dir| dir.join("files"))
 }
 
 fn files_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {

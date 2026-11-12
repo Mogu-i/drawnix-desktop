@@ -2,11 +2,7 @@ import { BoardTransforms, getSelectedElements, PlaitBoard, PlaitPointerType } fr
 import { isHotkey } from 'is-hotkey';
 import { addImage, canCopySelectionAs, copySelectionAsSvg, saveAsSvg } from '../utils/image';
 import { saveAsJSON, saveJSON } from '../data/json';
-import {
-  getTauriCurrentFile,
-  isTauriEnvironment,
-  saveToTauriFile,
-} from '../data/tauri-file';
+import { isTauriEnvironment } from '../data/tauri-file';
 import {
   DrawnixBoard,
   DrawnixFreehandPointer,
@@ -18,6 +14,12 @@ import { BoardCreationMode, setCreationMode } from '@plait/common';
 import { MindPointerType } from '@plait/mind';
 import { FreehandShape } from './freehand/type';
 import { ArrowLineShape, BasicShapes } from '@plait/draw';
+
+/**
+ * 文档编辑器（.table/.markdown 覆盖层）是否打开：与 react-board 的 board-clipboard
+ * 同判定（未从包导出，避免跨包依赖），文档打开时白板的副作用快捷键全部让路
+ */
+const isDocEditorOpen = (): boolean => !!document.querySelector('.doc-editor');
 
 export const buildDrawnixHotkeyPlugin = (
   updateAppState: (appState: Partial<DrawnixState>) => void
@@ -39,6 +41,15 @@ export const buildDrawnixHotkeyPlugin = (
     board.globalKeyDown = (event: KeyboardEvent) => {
       const isTypingNormal =
         event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+      // 文档编辑器打开时白板的副作用快捷键全部让路（键盘守卫）：Ctrl+S 保存由
+      // 页签栏的 saveCurrentFile 统一处理，mod+shift+s/e、mod+u 与单键工具切换
+      // 属于文档编辑域；表格单元格是 <td> 不满足 isTypingNormal，不守卫会在
+      // 编辑表格时同时触发白板快捷键（Ctrl+S 错写事故的触发链之一）。
+      // 原始链路仍无条件回灌，不干扰白板内部状态机
+      if (!isTypingNormal && isDocEditorOpen()) {
+        globalKeyDown(event);
+        return;
+      }
       if (
         !isTypingNormal &&
         (PlaitBoard.getMovingPointInBoard(board) || PlaitBoard.isMovingPointInBoard(board)) &&
@@ -57,16 +68,13 @@ export const buildDrawnixHotkeyPlugin = (
           return;
         }
         if (isHotkey(['mod+s'], { byKey: true })(event)) {
-          if (isTauriEnvironment() && getTauriCurrentFile()) {
-            saveToTauriFile(board).catch((error) => {
-              console.error('Failed to save drawnix file:', error);
+          // Tauri 端保存统一走页签栏 saveCurrentFile（按 fileType 分派），这里不再
+          // 直连 saveToTauriFile——一次按键两套保存曾把表格路径写成白板文件；
+          // 仅 preventDefault 吞掉默认行为。web 端无页签栏，保留 saveJSON 原路径
+          if (!isTauriEnvironment()) {
+            saveJSON(board, (board as DrawnixBoard).appState.fileHandle).then(({ fileHandle }) => {
+              updateAppState({ fileHandle });
             });
-          } else {
-            saveJSON(board, (board as DrawnixBoard).appState.fileHandle).then(
-              ({ fileHandle }) => {
-                updateAppState({ fileHandle });
-              }
-            );
           }
           event.preventDefault();
           return;

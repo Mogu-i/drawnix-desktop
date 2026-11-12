@@ -42,7 +42,7 @@ import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
 import { CleanConfirm } from './components/clean-confirm/clean-confirm';
 import { buildTextLinkPlugin } from './plugins/with-text-link';
 import { LinkPopup } from './components/popup/link-popup/link-popup';
-import { I18nProvider, setBoardLanguage } from './i18n';
+import { I18nProvider, i18nInsidePlaitHook, setBoardLanguage } from './i18n';
 import type { Language } from './i18n/types';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
@@ -58,10 +58,20 @@ import { WelcomePage } from './components/welcome-page/welcome-page';
 import { DocEditor } from './components/doc-editor/doc-editor';
 import { RestoreOpenedFile } from './components/restore-opened-file/restore-opened-file';
 import {
+  getTauriFileState,
+  getTauriTabId,
   isTauriEnvironment,
   markTauriFileDirty,
+  saveToTauriFile,
   useTauriFileState,
 } from './data/tauri-file';
+import {
+  flushBoardSessionStateNow,
+  scheduleBoardDraft,
+  scheduleBoardViewport,
+} from './data/board-draft';
+import { flushTauriAutoSaveNow, scheduleTauriAutoSave } from './data/tauri-auto-save';
+import { serializeAsJSON } from './data/json';
 
 export type DrawnixProps = {
   value: PlaitElement[];
@@ -151,6 +161,8 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   if (board) {
     board.appState = appState;
     board.showToast = showToast;
+    // 插件链路的 i18n 文案通道：随语言切换动态解析（WeakMap boardLanguageMap）
+    board.t = i18nInsidePlaitHook(board).t;
   }
 
   useEffect(() => {
@@ -170,10 +182,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         setAppState((current) => ({ ...current, isContentFullscreen: false }));
       }
       // Ctrl+\（沿用 Figma「显示/隐藏 UI」惯例）：全屏时在沉浸画面与可标注工具栏间切换
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        (event.key === '\\' || event.code === 'Backslash')
-      ) {
+      if ((event.ctrlKey || event.metaKey) && (event.key === '\\' || event.code === 'Backslash')) {
         event.preventDefault();
         setAppState((current) => ({
           ...current,
@@ -186,6 +195,34 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [appState.isContentFullscreen]);
+
+  // 桌面端：失焦 / 页面隐藏 / 刷新前把防抖中的白板草稿与视口状态立即落盘，
+  // 进程被系统回收（休眠唤醒、后台 WebView 回收）后重启仍能恢复未保存内容
+  useEffect(() => {
+    if (!isTauriEnvironment()) {
+      return;
+    }
+    const flush = () => {
+      // 自动保存防抖中的修改立即写盘 + 草稿/视口落盘（进程被回收后可恢复）
+      void flushTauriAutoSaveNow();
+      void flushBoardSessionStateNow();
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        flush();
+      }
+    };
+    window.addEventListener('blur', flush);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('blur', flush);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
 
   // Tauri 环境：拦截窗口关闭（系统关闭钮 / Alt+F4），先进入退出确认流程（D5）
   useEffect(() => {
@@ -326,8 +363,38 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   !PlaitOperation.isSetSelectionOperation(op) &&
                   !PlaitOperation.isSetViewportOperation(op)
               );
-              if (hasContentChange) {
-                markTauriFileDirty();
+              // 白板隔离：活动文件不是白板（文档编辑器打开覆盖在其上）时，白板的
+              // 残余 change 不得给文档页签标脏，也不得把白板草稿/自动保存任务挂
+              // 到文档路径上（同名不同类型文件共用路径，曾致表格被误标脏、
+              // 白板内容错写到表格文件）
+              const { currentFile, fileType } = getTauriFileState();
+              if (hasContentChange && fileType === 'drawnix') {
+                markTauriFileDirty(currentFile ?? undefined, 'drawnix');
+                // 未保存白板草稿按复合键防抖写入 IndexedDB（Bug 1）：
+                // 不挂在 markTauriFileDirty 里——它受 500ms 抑制窗口影响会漏写；
+                // web 端无 currentFile，条件不满足自然跳过
+                if (board && isTauriEnvironment() && currentFile) {
+                  scheduleBoardDraft(currentFile, serializeAsJSON(board));
+                  // 自动保存（所有文件）：编辑停止 1s 后自动写盘，无需手动 Ctrl+S；
+                  // 写盘成功由 saveToTauriFile 清脏清草稿（橙点消失），失败保留橙点，
+                  // 草稿兜底不受影响；任务惰性取 board 最新内容
+                  scheduleTauriAutoSave(currentFile, 'drawnix', () =>
+                    saveToTauriFile(board, currentFile, 'drawnix')
+                  );
+                }
+              }
+              // 手动缩放/平移的视口轻量持久化（Bug 2 附带）：不标脏、不写盘，
+              // 只缩放不编辑时重启仍能恢复 zoom；set_viewport 不进 hasContentChange，
+              // 避免产生假脏橙点
+              if (data.operations.some((op) => PlaitOperation.isSetViewportOperation(op))) {
+                const fileState = getTauriFileState();
+                if (
+                  isTauriEnvironment() &&
+                  fileState.currentFile &&
+                  fileState.fileType === 'drawnix'
+                ) {
+                  scheduleBoardViewport(fileState.currentFile, data.viewport);
+                }
               }
               onChange?.(data);
             }}
@@ -356,7 +423,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   </Board>
                   {isDocOpen && currentFile && (
                     <DocEditor
-                      key={currentFile}
+                      // 复合键：同名不同类型页签互切时编辑器按身份重挂载，
+                      // 避免残留上一类型编辑器的输入状态与卸载回写
+                      key={getTauriTabId(currentFile, currentFileType)}
                       path={currentFile}
                       fileType={currentFileType as 'md' | 'table'}
                     ></DocEditor>
