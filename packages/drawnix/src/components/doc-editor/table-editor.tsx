@@ -10,9 +10,25 @@ import {
 } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import type { Translations } from '../../i18n/types';
+import { useDrawnix } from '../../hooks/use-drawnix';
 import { MoreIcon } from '../icons';
 import { Select } from '../select/select';
 import './table-editor.scss';
+import {
+  TABLE_CLIPBOARD_MIME,
+  applyPasteToData,
+  buildClipboardPayload,
+  buildHtmlFromGrid,
+  buildTsvFromGrid,
+  decodeClipboardPayload,
+  findMasterCell,
+  gridFromPayload,
+  hasMergeInRect,
+  parseHtmlTableGrid,
+  parseTextGrid,
+  unmergeRegion,
+} from './table-clipboard';
+import type { TableClipboardPayload } from './table-clipboard';
 import { useDocAutoSave } from './use-doc-auto-save';
 import { useDocHistory } from './use-doc-history';
 import {
@@ -87,63 +103,6 @@ const normalizeRect = (a: CellPos, b: CellPos): SelectionRect => ({
   c2: Math.max(a.col, b.col),
 });
 
-/** 找到覆盖 (row, col) 的合并区域主单元格 */
-const findMasterCell = (
-  data: TableFileData,
-  row: number,
-  col: number
-): { row: number; col: number; cell: TableCellData } | null => {
-  for (let r = 0; r < data.rows; r++) {
-    for (let c = 0; c < data.cols; c++) {
-      const cell = data.cells[r]?.[c];
-      if (!cell || cell.hidden) {
-        continue;
-      }
-      const rowSpan = cell.rowSpan ?? 1;
-      const colSpan = cell.colSpan ?? 1;
-      if (rowSpan > 1 || colSpan > 1) {
-        if (row >= r && row < r + rowSpan && col >= c && col < c + colSpan) {
-          return { row: r, col: c, cell };
-        }
-      }
-    }
-  }
-  return null;
-};
-
-/** 解散以 (masterRow, masterCol) 为主单元格的合并区域 */
-const unmergeRegion = (data: TableFileData, masterRow: number, masterCol: number) => {
-  const master = data.cells[masterRow]?.[masterCol];
-  if (!master) {
-    return;
-  }
-  const rowSpan = master.rowSpan ?? 1;
-  const colSpan = master.colSpan ?? 1;
-  for (let r = masterRow; r < masterRow + rowSpan; r++) {
-    for (let c = masterCol; c < masterCol + colSpan; c++) {
-      const cell = data.cells[r]?.[c];
-      if (!cell) {
-        continue;
-      }
-      delete cell.rowSpan;
-      delete cell.colSpan;
-      delete cell.hidden;
-    }
-  }
-};
-
-const hasMergeInRect = (data: TableFileData, rect: SelectionRect) => {
-  for (let r = rect.r1; r <= rect.r2; r++) {
-    for (let c = rect.c1; c <= rect.c2; c++) {
-      const cell = data.cells[r]?.[c];
-      if (cell && (cell.hidden || (cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1)) {
-        return true;
-      }
-    }
-  }
-  return false;
-};
-
 /**
  * 编辑态镜像占位文本：与展示态同样以不换行空格兜底空内容，
  * 并给末尾换行补一个不可见字符，保证该换行产生的空行也计入高度
@@ -155,6 +114,8 @@ const buildMirrorText = (draft: string) =>
 // 字号、文字颜色与单元格背景色，修改防抖后自动保存回对应文件
 export const TableEditor = ({ path }: { path: string }) => {
   const { t } = useI18n();
+  // 复制/粘贴的用户提示（复制成功、合并冲突、空剪贴板、合并降级）
+  const { showToast } = useDrawnix();
   // 主题变量都定义在 .drawnix 根上，Select 浮层需 portal 进根内（G4）
   const container = useDrawnixContainer();
   const [data, setData] = useState<TableFileData | null>(null);
@@ -185,6 +146,14 @@ export const TableEditor = ({ path }: { path: string }) => {
   } | null>(null);
   // 表格容器：接收键盘导航事件（tabIndex 聚焦）
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  // IME 代理输入：常驻的视觉隐藏 textarea，焦点常驻于此以承接中文输入法
+  // 组合与直接键入录入；只做输入捕获，不承载业务数据、不写进 data、不进历史
+  const imeProxyRef = useRef<HTMLTextAreaElement | null>(null);
+  // 本次编辑的触发来源：'typeover'（选中后直接键入，Esc 放弃覆盖）/
+  // 'explicit'（双击/回车进入，保持原有 Escape 提交语义）
+  const editingOriginRef = useRef<'typeover' | 'explicit' | null>(null);
+  // 中文输入法组合进行中标记：组合期间代理的 input 事件只是拼音中间串，不能消费
+  const composingRef = useRef(false);
   // 拖拽手柄定位基准：行/列声明尺寸只是最小值，内容（换行/字号/padding）
   // 撑高时浏览器会把行实际渲染得更高，手柄必须按 DOM 实测边界定位才会与边框对齐
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -525,6 +494,162 @@ export const TableEditor = ({ path }: { path: string }) => {
     commit(next);
   };
 
+  // ----- 复制与粘贴 -----
+
+  // 选中态复制：一次写入 TSV / HTML <table> / 自定义 MIME 三种格式；
+  // 编辑态不拦截（放行给单元格 textarea 的原生复制）。复制不改选区、
+  // 不进历史、不标脏；preventDefault + stopPropagation 阻止浏览器默认
+  // 行为并防止冒泡到 window 被白板 copy 监听覆盖（白板侧守卫另行兜底）
+  const handleCopy = (event: React.ClipboardEvent) => {
+    if (editing !== null) {
+      return;
+    }
+    if (!data || !rect) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const payload = buildClipboardPayload(data, rect);
+    const grid = gridFromPayload(payload);
+    event.clipboardData.setData('text/plain', buildTsvFromGrid(grid));
+    event.clipboardData.setData('text/html', buildHtmlFromGrid(grid));
+    try {
+      event.clipboardData.setData(TABLE_CLIPBOARD_MIME, JSON.stringify(payload));
+    } catch {
+      // 自定义 MIME 不可用时降级为前两种（Excel/网页语义仍完整）
+    }
+    showToast({ message: t('table.copySuccess'), type: 'success' });
+  };
+
+  // 整次粘贴 = 一次 structuredClone + 一次 commit（一次历史快照、一次保存）
+  const commitPaste = (payload: TableClipboardPayload | null, grid: string[][] | null) => {
+    if (!data || !rect) {
+      return;
+    }
+    const rowCount = payload?.rows ?? grid?.length ?? 0;
+    const colCount = payload?.cols ?? grid?.[0]?.length ?? 0;
+    if (!rowCount || !colCount) {
+      return;
+    }
+    // 目标区域与现有数据相交的部分含合并单元格时拒绝粘贴，避免破坏合并结构；
+    // 超出当前行列的扩展区域是新空格，无需检查
+    const intersectRect = {
+      r1: rect.r1,
+      c1: rect.c1,
+      r2: Math.min(rect.r1 + rowCount - 1, data.rows - 1),
+      c2: Math.min(rect.c1 + colCount - 1, data.cols - 1),
+    };
+    if (hasMergeInRect(data, intersectRect)) {
+      showToast({ message: t('table.paste.mergeConflict'), type: 'error' });
+      return;
+    }
+    const result = applyPasteToData(data, {
+      payload,
+      grid,
+      targetRow: rect.r1,
+      targetCol: rect.c1,
+    });
+    if (!result) {
+      return;
+    }
+    commit(result.next);
+    // 选区扩到实际粘贴区域，焦点交还容器（IME 代理）
+    setSel({
+      anchor: { row: rect.r1, col: rect.c1 },
+      focus: { row: result.endRow, col: result.endCol },
+    });
+    focusTableWrap();
+  };
+
+  // 选中态粘贴：自定义 MIME -> HTML <table> -> TSV/CSV/多行/单段纯文本；
+  // 编辑态不拦截（放行给单元格 textarea 的原生粘贴）
+  const handlePaste = (event: React.ClipboardEvent) => {
+    if (editing !== null) {
+      return;
+    }
+    if (!data || !rect) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const clipboardData = event.clipboardData;
+    // 1) 应用内无损格式（带样式），跨文件粘贴也走此通道
+    const payloadJson = clipboardData.getData(TABLE_CLIPBOARD_MIME);
+    if (payloadJson) {
+      const payload = decodeClipboardPayload(payloadJson);
+      if (payload) {
+        commitPaste(payload, null);
+        return;
+      }
+    }
+    // 2) 网页/Excel/Word 的 HTML 表格
+    const rawHtml = clipboardData.getData('text/html');
+    if (rawHtml) {
+      const parsed = parseHtmlTableGrid(rawHtml);
+      if (parsed) {
+        if (parsed.hasMerge) {
+          showToast({ message: t('table.paste.mergeIgnored'), type: 'info' });
+        }
+        commitPaste(null, parsed.grid);
+        return;
+      }
+    }
+    // 3) TSV / CSV / 多行纯文本
+    const text = clipboardData.getData('text/plain');
+    if (!text.trim()) {
+      showToast({ message: t('table.paste.empty'), type: 'error' });
+      return;
+    }
+    const grid = parseTextGrid(text);
+    if (grid && grid.length) {
+      commitPaste(null, grid);
+      return;
+    }
+    // 单段纯文本：只写当前单元格，不扩行列、不改目标格样式
+    commitPaste(null, [[text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')]]);
+  };
+
+  // ----- 直接键入录入（IME 代理） -----
+
+  // Excel 风格：单击选中后敲任意可打印字符（含中文输入法上屏）即清空原内容、
+  // 以该字符作为初始内容进入编辑态；双击/回车进入编辑仍保留原内容。
+  // 代理只做输入捕获，不承载业务数据、不写进 data、不进历史
+  const commitProxyChar = (text: string) => {
+    if (!text || !sel || editing !== null) {
+      return;
+    }
+    const pos = clampCell(sel.anchor.row, sel.anchor.col);
+    startEditing(pos, text, 'typeover');
+  };
+
+  const clearProxyValue = () => {
+    if (imeProxyRef.current) {
+      imeProxyRef.current.value = '';
+    }
+  };
+
+  // 英文/数字/符号：input 拿到字符即消费；中文组合期间 input 只是拼音中间串，
+  // 等 compositionend 一次性拿上屏文本（兼容组合期间 input 先发的浏览器）
+  const handleProxyInput = (event: React.FormEvent<HTMLTextAreaElement>) => {
+    if (composingRef.current) {
+      return;
+    }
+    const value = event.currentTarget.value;
+    clearProxyValue();
+    commitProxyChar(value);
+  };
+
+  const handleProxyCompositionStart = () => {
+    composingRef.current = true;
+  };
+
+  const handleProxyCompositionEnd = (event: React.CompositionEvent<HTMLTextAreaElement>) => {
+    composingRef.current = false;
+    const value = event.currentTarget.value || event.data;
+    clearProxyValue();
+    commitProxyChar(value);
+  };
+
   // 单击仅选中，双击才进入编辑（onDoubleClick），避免误触；
   // 同时聚焦表格容器以接收键盘导航事件
   const handleCellMouseDown = (row: number, col: number, event: React.MouseEvent) => {
@@ -537,8 +662,14 @@ export const TableEditor = ({ path }: { path: string }) => {
     setSel({ anchor: { row, col }, focus: { row, col } });
   };
 
-  // 进入编辑态：把单元格现有内容同步为草稿，镜像才能立刻撑出真实高度
-  const startEditing = (pos: CellPos, text: string) => {
+  // 进入编辑态：把单元格现有内容同步为草稿，镜像才能立刻撑出真实高度；
+  // origin 记录触发来源，直接键入（typeover）与双击/回车（explicit）的 Escape 语义不同
+  const startEditing = (
+    pos: CellPos,
+    text: string,
+    origin: 'typeover' | 'explicit' = 'explicit'
+  ) => {
+    editingOriginRef.current = origin;
     setDraft(text);
     setEditing(pos);
   };
@@ -546,9 +677,12 @@ export const TableEditor = ({ path }: { path: string }) => {
   // ----- 键盘导航 -----
 
   // 键盘事件由可聚焦的表格容器接收：单击单元格时主动聚焦，
-  // 编辑框提交/退出后也把焦点交还容器，保证后续导航按键不丢失
+  // 编辑框提交/退出后也把焦点交还容器，保证后续导航按键不丢失。
+  // 焦点实际落在 IME 代理（容器的子元素）上：普通 div 无法启动中文输入法
+  // 组合，代理聚焦后字符/拼音先进入代理再消费；导航键经事件冒泡仍由
+  // handleTableKeyDown 接收，对既有导航/撤销行为无感知差异
   const focusTableWrap = () => {
-    tableWrapRef.current?.focus({ preventScroll: true });
+    imeProxyRef.current?.focus({ preventScroll: true });
   };
 
   /** 钳制到有效范围；目标落在合并区域内时落到主单元格 */
@@ -1268,6 +1402,8 @@ export const TableEditor = ({ path }: { path: string }) => {
           ref={tableWrapRef}
           tabIndex={0}
           onKeyDown={handleTableKeyDown}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
           className={classNames('table-editor__table-wrap', {
             'table-editor__table-wrap--resizing': resizing,
           })}
@@ -1277,6 +1413,21 @@ export const TableEditor = ({ path }: { path: string }) => {
               : undefined
           }
         >
+          {/* IME 代理输入：sr-only 样式视觉隐藏但可聚焦（display:none 不可聚焦、
+              aria-hidden 元素被屏幕阅读器忽略且语义不当），焦点常驻于此；
+              键盘导航经冒泡仍走 handleTableKeyDown，字符/拼音由代理承接 */}
+          <textarea
+            ref={imeProxyRef}
+            className="table-editor__ime-proxy"
+            aria-label={t('table.imeProxy')}
+            tabIndex={-1}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            onInput={handleProxyInput}
+            onCompositionStart={handleProxyCompositionStart}
+            onCompositionEnd={handleProxyCompositionEnd}
+          />
           <table ref={tableRef} className="table-editor__table" cellPadding={0}>
             <colgroup>
               {colWidths.map((width, c) => (
@@ -1328,6 +1479,8 @@ export const TableEditor = ({ path }: { path: string }) => {
                                 editor.setSelectionRange(editor.value.length, editor.value.length);
                               }}
                               onBlur={(event) => {
+                                // 退出编辑时清除触发来源标记，避免影响下一次编辑会话
+                                editingOriginRef.current = null;
                                 if (suppressBlurRef.current) {
                                   suppressBlurRef.current = false;
                                   setEditing(null);
@@ -1366,12 +1519,24 @@ export const TableEditor = ({ path }: { path: string }) => {
                                   }
                                 }
                                 // 回车提交并退出编辑（Shift+回车换行）；
-                                // Escape 同样走 blur 提交，避免误按丢失输入
-                                if (
-                                  (event.key === 'Enter' && !event.shiftKey) ||
-                                  event.key === 'Escape'
-                                ) {
+                                // Escape 语义按触发来源区分：直接键入触发的编辑
+                                // 按 Excel 习惯放弃覆盖、恢复原文本；双击/回车触发的
+                                // 编辑保持原有 blur 提交语义，避免误按丢失输入
+                                if (event.key === 'Enter' && !event.shiftKey) {
                                   event.preventDefault();
+                                  (event.target as HTMLTextAreaElement).blur();
+                                  focusTableWrap();
+                                  return;
+                                }
+                                if (event.key === 'Escape') {
+                                  event.preventDefault();
+                                  if (editingOriginRef.current === 'typeover') {
+                                    suppressBlurRef.current = true;
+                                    setEditing(null);
+                                    editingOriginRef.current = null;
+                                    focusTableWrap();
+                                    return;
+                                  }
                                   (event.target as HTMLTextAreaElement).blur();
                                   focusTableWrap();
                                   return;

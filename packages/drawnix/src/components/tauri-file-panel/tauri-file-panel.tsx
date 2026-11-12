@@ -61,6 +61,17 @@ import {
   useTauriFileState,
   writeTauriFile,
 } from '../../data/tauri-file';
+import {
+  clearBoardDraft,
+  clearBoardDraftsByPrefix,
+  clearBoardViewport,
+  clearBoardViewportsByPrefix,
+  flushBoardSessionStateNow,
+} from '../../data/board-draft';
+import {
+  cancelTauriAutoSave,
+  flushTauriAutoSaveNow,
+} from '../../data/tauri-auto-save';
 import { fileSave } from '../../data/filesystem';
 import { MIME_TYPES } from '../../constants';
 import { saveAsPng, saveAsSvg } from '../../utils/image';
@@ -409,6 +420,9 @@ export const TauriFilePanel = () => {
         return;
       }
       const fileType = asFileType(ext);
+      // 切走前把防抖中的自动保存立即写盘（此刻旧文件仍是活动文件，校验通过）：
+      // ensureCurrentFileSaved 与切换之间是异步窗口，期间的新编辑依赖此 flush
+      void flushTauriAutoSaveNow();
       setCurrentTauriFile(path, fileType);
       if (fileType === 'drawnix') {
         // Markdown/表格文件由文档编辑器自行加载，白板文件在这里直接载入画板
@@ -429,6 +443,15 @@ export const TauriFilePanel = () => {
     options: CreateTauriFileOptions
   ) => {
     try {
+      // 新建文件会切走当前打开的文件：先自动保存未保存的白板编辑（失败不切换，
+      // 避免静默清空当前编辑）；文档未落盘内容在草稿中，由文档编辑器卸载时自动写回；
+      // 白板若有防抖中的草稿（编辑后 400ms 内新建）也立即落盘再切走
+      if (!(await ensureCurrentFileSaved())) {
+        return;
+      }
+      void flushBoardSessionStateNow();
+      // 自动保存防抖中的修改也立即写盘后再切走（与 openFile 同理）
+      void flushTauriAutoSaveNow();
       const path = joinPath(dirPath, name);
       if (fileType === 'md') {
         await writeTauriFile(path, buildEmptyMarkdownContent(), 'md');
@@ -438,6 +461,9 @@ export const TauriFilePanel = () => {
         setCurrentTauriFile(path, 'table');
       } else {
         await writeTauriFile(path, buildEmptyDrawnixContent());
+        // 同路径可能残留已删除文件的历史草稿/视口，清掉防止新文件命中旧内容
+        void clearBoardDraft(path);
+        clearBoardViewport(path);
         setCurrentTauriFile(path, 'drawnix');
         clearAndLoad([]);
       }
@@ -488,6 +514,8 @@ export const TauriFilePanel = () => {
       if (currentFile !== filePath) {
         const content = await readTauriFile(filePath);
         const { elements, viewport, theme } = parseTauriFileContent(content);
+        // 切走前把防抖中的自动保存立即写盘（与 openFile 同理）
+        void flushTauriAutoSaveNow();
         setCurrentTauriFile(filePath, 'drawnix');
         clearAndLoad(elements as PlaitElement[], viewport, theme);
       }
@@ -518,6 +546,12 @@ export const TauriFilePanel = () => {
         suppressTauriFileSave(target.path, asFileType(target.ext));
       }
       await deleteTauriFile(target.path, asFileType(target.ext));
+      // 文件已删除：清掉防抖中的自动保存任务（suppress 兜底跳过写盘，
+      // cancel 负责清掉残留定时器；删除失败时不 cancel，resume 后任务仍能自动写盘）
+      cancelTauriAutoSave(target.path, asFileType(target.ext));
+      // 被删文件的草稿/视口一并清除：否则在原路径重建同名文件时会命中旧内容
+      void clearBoardDraft(target.path);
+      clearBoardViewport(target.path);
       if (isCurrentDoc) {
         setCurrentTauriFile(null);
         clearAndLoad([]);
@@ -554,6 +588,9 @@ export const TauriFilePanel = () => {
         clearAndLoad([]);
       }
       await deleteTauriFolder(path);
+      // 组内文件的草稿/视口一并清除（前缀为分组路径），原路径重建不误命中
+      void clearBoardDraftsByPrefix(`${path}/`);
+      clearBoardViewportsByPrefix(`${path}/`);
       refreshTree();
       refreshTrash();
       // 广播变更：分组内被引用的文件卡片重新读取后进入“文件不存在”状态
@@ -729,6 +766,9 @@ export const TauriFilePanel = () => {
       syncFileRefCardPaths(board, [{ from: oldPath, to: newPath }]);
       notifyTauriFilesChanged();
       if (isCurrentDoc) {
+        // 旧路径身份已失效：清掉防抖中的旧任务（重命名失败时不会走到这里，
+        // 任务保留，resume 后防抖窗口内仍能自动写盘）
+        cancelTauriAutoSave(oldPath, asFileType(ext));
         retargetCurrentDoc(newPath);
       }
       refreshTree();

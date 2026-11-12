@@ -3,14 +3,17 @@ import {
   isTauriFileSaveSuppressed,
   markTauriFileDirty,
   resumeTauriFileSave,
+  saveTauriDocFile,
   setTauriDocDraft,
 } from '../../data/tauri-file';
+import { scheduleTauriAutoSave } from '../../data/tauri-auto-save';
 
 /**
  * 文档编辑器（Markdown/表格）的编辑捕获逻辑，由两种编辑器共用：
- * 编辑时只标脏并写草稿缓存（localStorage），不直接写盘；
- * 落盘统一由页签栏保存入口（保存按钮 / Ctrl+S / 退出前 flush）触发，
- * 保存失败时草稿与脏标记保留，输入与光标不受影响
+ * 编辑时标脏并写草稿缓存（localStorage），同时调度自动写盘
+ * （编辑停止 1s 后落盘，所有文件自动保存）；落盘也可由页签栏保存入口
+ * （保存按钮 / Ctrl+S / 退出前 flush）触发，保存失败时草稿与脏标记保留，
+ * 输入与光标不受影响
  */
 export const useDocAutoSave = (
   path: string,
@@ -41,7 +44,13 @@ export const useDocAutoSave = (
     }
     markTauriFileDirty(path, fileType);
     flushDraft();
-  }, [flushDraft, path, fileType]);
+    // 自动保存（所有文件）：编辑停止 1s 后自动写盘；serialize 惰性执行
+    // （写盘时才取最新内容），编辑器未就绪返回 null 时跳过本次写盘
+    scheduleTauriAutoSave(path, fileType, () => {
+      const content = serialize();
+      return content === null ? Promise.resolve() : saveTauriDocFile(path, content, fileType);
+    });
+  }, [flushDraft, path, fileType, serialize]);
 
   const markLoaded = useCallback(() => {
     // 重新打开同名路径的文件（如删除后重建）时恢复自动保存

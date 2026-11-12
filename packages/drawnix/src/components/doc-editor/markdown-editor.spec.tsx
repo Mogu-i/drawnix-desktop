@@ -7,6 +7,8 @@ const readTauriFileMock = vi.fn();
 vi.mock('../../data/tauri-file', () => ({
   readTauriFile: (...args: unknown[]) => readTauriFileMock(...args),
   writeTauriFile: vi.fn().mockResolvedValue(undefined),
+  // 文档草稿读取：返回 null 表示无草稿，编辑器回退 readTauriFile 加载磁盘内容
+  getTauriDocDraft: vi.fn(() => null),
   markTauriFileDirty: vi.fn(),
   clearTauriFileDirty: vi.fn(),
 }));

@@ -94,6 +94,10 @@ const zhTranslations: Translations = {
   'toast.tauriFile.deleteFailed': '删除失败',
   'toast.tauriFile.restoreFailed': '恢复失败',
   'toast.tauriFile.createFolderFailed': '创建文件夹失败，目标文件夹可能已存在',
+  'toast.tauriFile.draftRestored': '已恢复上次未保存的编辑',
+  'toast.tauriFile.draftCorrupted': '草稿无法读取，已加载磁盘版本',
+  'toast.imageUnsupported': '不支持的图片格式，无法粘贴',
+  'toast.imageFetchFallback': '网页图片获取失败，已粘贴为文字',
 
   // Language
   'language.switcher': 'Language',
@@ -205,6 +209,11 @@ const zhTranslations: Translations = {
   'table.disabled.col': '至少保留一列',
   'table.disabled.merge': '选中多个单元格后才能合并',
   'table.disabled.unmerge': '选区内没有可取消的合并单元格',
+  'table.copySuccess': '复制成功',
+  'table.paste.mergeConflict': '目标区域包含合并单元格，无法粘贴',
+  'table.paste.mergeIgnored': '源内容包含合并单元格，已按纯文本粘贴',
+  'table.paste.empty': '剪贴板中没有可粘贴的表格内容',
+  'table.imeProxy': '表格输入代理',
 
   // Markdown editor
   'markdown.placeholder': '在此输入 Markdown 内容…',
@@ -247,8 +256,7 @@ const zhTranslations: Translations = {
 
   // Delete folder confirm dialog
   'folderDeleteConfirm.title': '删除文件夹',
-  'folderDeleteConfirm.description':
-    '文件夹将被删除，其中的文件与子文件夹会移到顶层。是否继续？',
+  'folderDeleteConfirm.description': '文件夹将被删除，其中的文件与子文件夹会移到顶层。是否继续？',
 
   // Move entry dialog
   'moveDialog.title': '选择目标分组',

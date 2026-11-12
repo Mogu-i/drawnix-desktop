@@ -3,6 +3,12 @@ import { PlaitBoard } from '@plait/core';
 import { VERSIONS } from '../constants';
 import { DrawnixExportedType } from './types';
 import { isValidDrawnixData, serializeAsJSON } from './json';
+import {
+  clearBoardDraft,
+  clearBoardViewport,
+  renameBoardDraft,
+  renameBoardViewport,
+} from './board-draft';
 
 export type TauriTreeFileEntry = {
   /** 相对路径（不含扩展名），如 `分组A/未命名` */
@@ -54,7 +60,7 @@ export type TauriFileState = {
   /** 已打开的文件页签（内容区上方页签栏，按打开顺序） */
   openTabs: TauriOpenTab[];
   /** 按文件记录的未保存状态：仅包含有未保存修改的文件，橙点/退出清单均从此推导；
- *  键为「路径:类型」复合身份（getTauriTabId），同名不同类型文件各自独立 */
+   *  键为「路径:类型」复合身份（getTauriTabId），同名不同类型文件各自独立 */
   dirty: Record<string, true>;
 };
 
@@ -275,8 +281,7 @@ const sanitizeTabs = (tabs: unknown): TauriOpenTab[] => {
     if (typeof path !== 'string' || !path) {
       return [];
     }
-    const normalizedType =
-      typeof fileType === 'string' ? normalizeTauriFileType(fileType) : null;
+    const normalizedType = typeof fileType === 'string' ? normalizeTauriFileType(fileType) : null;
     return normalizedType ? [{ path, fileType: normalizedType }] : [];
   });
 };
@@ -370,9 +375,9 @@ const boardSnapshots = new Map<string, string>();
 const initialTab =
   persisted.activeId === null
     ? null
-    : persisted.openTabs.find(
-          (tab) => getTauriTabId(tab.path, tab.fileType) === persisted.activeId
-        ) ?? null;
+    : (persisted.openTabs.find(
+        (tab) => getTauriTabId(tab.path, tab.fileType) === persisted.activeId
+      ) ?? null);
 
 let state: TauriFileState = {
   currentFile: initialTab?.path ?? null,
@@ -405,9 +410,7 @@ const persistWorkbench = () => {
         openTabs: state.openTabs,
         // 活动页签身份为复合键：同名不同类型文件共用路径，
         // 只存路径会让重启恢复命中第一个同名页签而非真正活动的那一个
-        activeId: state.currentFile
-          ? getTauriTabId(state.currentFile, state.fileType)
-          : null,
+        activeId: state.currentFile ? getTauriTabId(state.currentFile, state.fileType) : null,
         dirty: state.dirty,
         docContents: docDrafts,
       };
@@ -463,6 +466,21 @@ export const markTauriFileDirty = (path?: string, fileType?: TauriFileType) => {
   if (Date.now() < suppressDirtyUntil) {
     return;
   }
+  const targetPath = path ?? state.currentFile;
+  if (!targetPath) {
+    return;
+  }
+  const target = getTauriTabId(targetPath, fileType ?? state.fileType);
+  if (state.dirty[target]) {
+    return;
+  }
+  setState({ dirty: { ...state.dirty, [target]: true } });
+};
+
+/** 强制标脏（绕过 500ms 抑制窗口）：仅用于草稿恢复等「未保存内容确已存在」的场景。
+ *  加载流程会设置抑制窗口，但窗口内不触发内容 change，恢复后的首次 markTauriFileDirty
+ *  会被窗口吞掉导致橙点不亮，草稿恢复必须走此入口 */
+export const forceMarkTauriFileDirty = (path?: string, fileType?: TauriFileType) => {
   const targetPath = path ?? state.currentFile;
   if (!targetPath) {
     return;
@@ -634,6 +652,8 @@ export const saveToTauriFile = async (board: PlaitBoard, path?: string): Promise
   }
   await writeTauriFile(filePath, serializeAsJSON(board), 'drawnix');
   boardSnapshots.delete(filePath);
+  // 磁盘已是最新，草稿兜底完成使命；清除失败不影响保存结果
+  void clearBoardDraft(filePath);
   clearTauriFileDirty(filePath, 'drawnix');
   return filePath;
 };
@@ -658,9 +678,7 @@ export const saveTauriDocFile = async (
 /** 收起页签：清除该文件的未保存痕迹；收起活动页签时切到相邻页签或欢迎页。
  *  返回收起后应成为活动页签的页签（null 表示回到欢迎页） */
 export const closeTauriTab = (path: string, fileType: TauriFileType): TauriOpenTab | null => {
-  const index = state.openTabs.findIndex(
-    (tab) => tab.path === path && tab.fileType === fileType
-  );
+  const index = state.openTabs.findIndex((tab) => tab.path === path && tab.fileType === fileType);
   if (index < 0) {
     return null;
   }
@@ -672,12 +690,15 @@ export const closeTauriTab = (path: string, fileType: TauriFileType): TauriOpenT
   const dirty = { ...state.dirty };
   delete dirty[getTauriTabId(path, fileType)];
   delete docDrafts[getTauriTabId(path, fileType)];
-  // 快照只存白板内容，同名文件中只有白板版会写入，按路径清理即可
+  // 快照/草稿只存白板内容，同名文件中只有白板版会写入，按路径清理即可；
+  // 收起页签 = 关闭该文件的视图状态，视口一并清除，重新打开回到自适应
   boardSnapshots.delete(path);
+  void clearBoardDraft(path);
+  clearBoardViewport(path);
   setState({
     openTabs,
-    currentFile: wasActive ? nextTab?.path ?? null : state.currentFile,
-    fileType: wasActive ? nextTab?.fileType ?? DEFAULT_FILE_TYPE : state.fileType,
+    currentFile: wasActive ? (nextTab?.path ?? null) : state.currentFile,
+    fileType: wasActive ? (nextTab?.fileType ?? DEFAULT_FILE_TYPE) : state.fileType,
     dirty,
   });
   if (wasActive && nextTab) {
@@ -711,6 +732,9 @@ export const renameTauriTabPath = (from: string, to: string, fileType: TauriFile
     boardSnapshots.set(to, snapshot);
     boardSnapshots.delete(from);
   }
+  // 草稿与视口键同步迁移（fire-and-forget），重命名/移动后切回仍能恢复未保存内容
+  void renameBoardDraft(from, to);
+  renameBoardViewport(from, to);
   // 旧路径的保存屏蔽保持原样：panel 在重命名/移动前已按旧路径屏蔽（防旧编辑器
   // 卸载回写在旧位置复活文件），屏蔽绑定路径本身而非页签，不能搬到新路径；
   // 新路径的可用性由下方 resume 保证
@@ -777,8 +801,7 @@ export const flushAllTauriDirtyFiles = async (
           await writeTauriFile(path, draft, fileType);
         }
       } else {
-        const isCurrentBoard =
-          path === state.currentFile && fileType === state.fileType;
+        const isCurrentBoard = path === state.currentFile && fileType === state.fileType;
         const snapshot =
           isCurrentBoard && getCurrentBoardContent
             ? getCurrentBoardContent()
@@ -800,9 +823,10 @@ export const flushAllTauriDirtyFiles = async (
       delete docDrafts[id];
       if (fileType === 'drawnix') {
         boardSnapshots.delete(path);
+        // 退出前写盘成功的文件草稿一并清除，失败者草稿保留供下次启动恢复
+        void clearBoardDraft(path);
       }
     }
     setState({ dirty });
   }
 };
-

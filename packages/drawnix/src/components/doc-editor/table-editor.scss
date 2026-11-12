@@ -29,7 +29,15 @@
   }
 
   &__table-wrap {
+    // 整块表格在编辑区水平居中：max-content 让 wrap 收缩到表格实际宽度，
+    // margin-inline auto 两侧留白均衡；比容器窄时居中，比容器宽时随内容溢出，
+    // 横向滚动仍能滚到第一列（不能用 flex + justify-content:center，
+    // 那会在表格溢出时裁掉左侧、滚不回去）。
+    // 选区覆盖层/resize 手柄以 wrap 为定位基准（position:relative 保留），
+    // wrap 与 table 同宽后测量不偏移。
     position: relative;
+    width: max-content;
+    margin-inline: auto;
 
     // 作为键盘导航的焦点容器，聚焦时不显示浏览器默认轮廓
     &:focus {
@@ -40,6 +48,29 @@
     &--resizing {
       user-select: none;
     }
+  }
+
+  // IME 输入代理：视觉隐藏但可聚焦（不能 display:none，否则无法启动输入法组合），
+  // 只做键盘/输入法捕获，不承载业务数据；焦点常驻其上，导航键冒泡仍走 handleTableKeyDown。
+  // sr-only 形态：1x1、透明、不响应指针，屏幕阅读器仅能读到 aria-label，
+  // 不会误认成可见输入框。
+  &__ime-proxy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    opacity: 0;
+    overflow: hidden;
+    resize: none;
+    pointer-events: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
   }
 
   &__table {

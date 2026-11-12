@@ -101,6 +101,10 @@ const arTranslations: Translations = {
   'toast.tauriFile.restoreFailed': 'فشل الاستعادة',
   'toast.tauriFile.createFolderFailed':
     'فشل إنشاء المجلد، قد يكون هناك مجلد بنفس الاسم موجودًا بالفعل',
+  'toast.tauriFile.draftRestored': 'تم استعادة التعديلات غير المحفوظة',
+  'toast.tauriFile.draftCorrupted': 'تعذّرت قراءة المسودة؛ تم تحميل النسخة المحفوظة على القرص',
+  'toast.imageUnsupported': 'صيغة الصورة غير مدعومة، لا يمكن اللصق',
+  'toast.imageFetchFallback': 'تعذر جلب صورة الويب؛ تم اللصق كنص',
 
   // Menu items
   'menu.open': 'فتح',
@@ -205,6 +209,11 @@ const arTranslations: Translations = {
   'table.disabled.col': 'يجب أن يبقى عمود واحد على الأقل',
   'table.disabled.merge': 'حدد خلايا متعددة لدمجها',
   'table.disabled.unmerge': 'لا توجد خلايا مدمجة في التحديد لإلغاء دمجها',
+  'table.copySuccess': 'تم النسخ',
+  'table.paste.mergeConflict': 'لا يمكن اللصق في منطقة تحتوي خلايا مدمجة',
+  'table.paste.mergeIgnored': 'تم لصق الخلايا المدمجة في المصدر كنص عادي',
+  'table.paste.empty': 'لا يوجد محتوى جدول قابل للصق في الحافظة',
+  'table.imeProxy': 'وكيل إدخال الجدول',
 
   // Markdown editor
   'markdown.placeholder': 'اكتب Markdown هنا…',
@@ -228,7 +237,8 @@ const arTranslations: Translations = {
   'markdown.toolbar.image': 'صورة',
   'markdown.toolbar.table': 'جدول',
   'markdown.toolbar.horizontalRule': 'فاصل أفقي',
-  'markdown.tableTemplate': '| العنوان 1 | العنوان 2 | العنوان 3 |\n| --- | --- | --- |\n|  |  |  |',
+  'markdown.tableTemplate':
+    '| العنوان 1 | العنوان 2 | العنوان 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'نص الرابط',
   'markdown.imagePlaceholder': 'وصف الصورة',
 
@@ -312,7 +322,8 @@ const arTranslations: Translations = {
   'workbench.exit.title': 'الخروج',
   'workbench.exit.dirtyDescription':
     'لدي {count} ملفات تغييرات غير محفوظة. يبقى المحتوى على هذا الجهاز، ويمكنك مواصلة التحرير بعد إعادة الفتح.',
-  'workbench.exit.cleanDescription': 'جميع الملفات محفوظة، ويمكنك إعادة فتحها ومواصلة التحرير في أي وقت.',
+  'workbench.exit.cleanDescription':
+    'جميع الملفات محفوظة، ويمكنك إعادة فتحها ومواصلة التحرير في أي وقت.',
   'workbench.exit.cancel': 'إلغاء',
   'workbench.exit.confirm': 'خروج',
 

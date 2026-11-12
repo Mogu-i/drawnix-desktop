@@ -14,6 +14,8 @@ import { isSupportedImageFileType } from '../data/blob';
 import { insertImage } from '../data/image';
 import { isHitImage, MindElement, ImageData } from '@plait/mind';
 import { ImageViewer } from '../libs/image-viewer';
+import { i18nInsidePlaitHook } from '../i18n';
+import type { DrawnixBoard } from '../hooks/use-drawnix';
 
 export const withImagePlugin = (board: PlaitBoard) => {
   const newBoard = board as PlaitBoard & PlaitImageBoard;
@@ -30,10 +32,21 @@ export const withImagePlugin = (board: PlaitBoard) => {
     targetPoint: Point,
     operationType?: WritableClipboardOperationType
   ) => {
-    if (clipboardData?.files?.length && isSupportedImageFileType(clipboardData.files[0].type)) {
+    if (clipboardData?.files?.length) {
       const imageFile = clipboardData.files[0];
-      insertImage(board, imageFile, targetPoint, false);
-      return;
+      if (isSupportedImageFileType(imageFile.type)) {
+        insertImage(board, imageFile, targetPoint, false);
+        return;
+      }
+      if (imageFile.type.startsWith('image/')) {
+        // 图片类文件但不在 IMAGE_MIME_TYPES 白名单：明确提示，不静默忽略
+        const { t } = i18nInsidePlaitHook(board);
+        (board as DrawnixBoard).showToast?.({
+          message: t('toast.imageUnsupported'),
+          type: 'error',
+        });
+        return;
+      }
     }
     insertFragment(clipboardData, targetPoint, operationType);
   };

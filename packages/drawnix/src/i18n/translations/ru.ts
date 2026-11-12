@@ -95,6 +95,10 @@ const ruTranslations: Translations = {
   'toast.tauriFile.restoreFailed': 'Не удалось восстановить',
   'toast.tauriFile.createFolderFailed':
     'Не удалось создать папку. Возможно, папка с таким именем уже существует',
+  'toast.tauriFile.draftRestored': 'Восстановлены несохранённые правки',
+  'toast.tauriFile.draftCorrupted': 'Не удалось прочитать черновик; загружена версия с диска',
+  'toast.imageUnsupported': 'Неподдерживаемый формат изображения, вставка невозможна',
+  'toast.imageFetchFallback': 'Не удалось загрузить изображение со страницы; вставлено как текст',
   // Language
   'language.switcher': 'Language',
   'language.chinese': '中文',
@@ -207,6 +211,11 @@ const ruTranslations: Translations = {
   'table.disabled.col': 'Должен остаться хотя бы один столбец',
   'table.disabled.merge': 'Выберите несколько ячеек, чтобы объединить их',
   'table.disabled.unmerge': 'В выделении нет объединённых ячеек',
+  'table.copySuccess': 'Скопировано',
+  'table.paste.mergeConflict': 'Нельзя вставить в область с объединёнными ячейками',
+  'table.paste.mergeIgnored': 'Объединённые ячейки источника вставлены как обычный текст',
+  'table.paste.empty': 'В буфере обмена нет содержимого таблицы для вставки',
+  'table.imeProxy': 'Прокси ввода таблицы',
 
   // Markdown editor
   'markdown.placeholder': 'Введите Markdown здесь…',
@@ -230,7 +239,8 @@ const ruTranslations: Translations = {
   'markdown.toolbar.image': 'Изображение',
   'markdown.toolbar.table': 'Таблица',
   'markdown.toolbar.horizontalRule': 'Разделитель',
-  'markdown.tableTemplate': '| Заголовок 1 | Заголовок 2 | Заголовок 3 |\n| --- | --- | --- |\n|  |  |  |',
+  'markdown.tableTemplate':
+    '| Заголовок 1 | Заголовок 2 | Заголовок 3 |\n| --- | --- | --- |\n|  |  |  |',
   'markdown.linkPlaceholder': 'текст ссылки',
   'markdown.imagePlaceholder': 'описание изображения',
 
@@ -314,7 +324,8 @@ const ruTranslations: Translations = {
   'workbench.exit.title': 'Выход',
   'workbench.exit.dirtyDescription':
     'В {count} файлах есть несохранённые изменения. Содержимое остаётся на этом устройстве, после повторного открытия можно продолжить редактирование.',
-  'workbench.exit.cleanDescription': 'Все файлы сохранены. Вы сможете снова открыть их и продолжить редактирование.',
+  'workbench.exit.cleanDescription':
+    'Все файлы сохранены. Вы сможете снова открыть их и продолжить редактирование.',
   'workbench.exit.cancel': 'Отмена',
   'workbench.exit.confirm': 'Выйти',
 

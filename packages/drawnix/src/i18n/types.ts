@@ -98,6 +98,10 @@ export interface Translations {
   'toast.tauriFile.deleteFailed': string;
   'toast.tauriFile.restoreFailed': string;
   'toast.tauriFile.createFolderFailed': string;
+  'toast.tauriFile.draftRestored': string;
+  'toast.tauriFile.draftCorrupted': string;
+  'toast.imageUnsupported': string;
+  'toast.imageFetchFallback': string;
 
   // Language
   'language.switcher': string;
@@ -208,6 +212,12 @@ export interface Translations {
   'table.disabled.col': string;
   'table.disabled.merge': string;
   'table.disabled.unmerge': string;
+  // Table editor clipboard & direct typing
+  'table.copySuccess': string;
+  'table.paste.mergeConflict': string;
+  'table.paste.mergeIgnored': string;
+  'table.paste.empty': string;
+  'table.imeProxy': string;
 
   // Markdown editor
   'markdown.placeholder': string;
