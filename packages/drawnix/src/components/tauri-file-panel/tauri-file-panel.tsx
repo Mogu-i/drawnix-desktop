@@ -68,10 +68,7 @@ import {
   clearBoardViewportsByPrefix,
   flushBoardSessionStateNow,
 } from '../../data/board-draft';
-import {
-  cancelTauriAutoSave,
-  flushTauriAutoSaveNow,
-} from '../../data/tauri-auto-save';
+import { cancelTauriAutoSave, flushTauriAutoSaveNow } from '../../data/tauri-auto-save';
 import { fileSave } from '../../data/filesystem';
 import { MIME_TYPES } from '../../constants';
 import { saveAsPng, saveAsSvg } from '../../utils/image';
@@ -115,9 +112,7 @@ type ContextMenuState = {
 type DeleteFileTarget = { path: string; ext: string };
 
 /** 待移动的条目目标 */
-type MoveTarget =
-  | { kind: 'file'; path: string; ext: string }
-  | { kind: 'folder'; path: string };
+type MoveTarget = { kind: 'file'; path: string; ext: string } | { kind: 'folder'; path: string };
 
 const asFileType = (ext: string | undefined): TauriFileType =>
   ext === 'md' || ext === 'table' ? ext : 'drawnix';
@@ -129,8 +124,7 @@ const parentOf = (rel: string) => {
 
 const lastSeg = (rel: string) => rel.slice(rel.lastIndexOf('/') + 1);
 
-const joinPath = (dir: string | null, name: string) =>
-  dir ? `${dir}/${name}` : name;
+const joinPath = (dir: string | null, name: string) => (dir ? `${dir}/${name}` : name);
 
 /** 行内命名输入的交互（C6）：Enter 提交、Escape 取消、点外面提交 */
 const InlineNameInput = ({
@@ -341,11 +335,7 @@ export const TauriFilePanel = () => {
 
   const { dirs, files, order } = tree;
 
-  const clearAndLoad = (
-    elements: PlaitElement[],
-    viewport?: Viewport,
-    theme?: PlaitTheme
-  ) => {
+  const clearAndLoad = (elements: PlaitElement[], viewport?: Viewport, theme?: PlaitTheme) => {
     suppressTauriDirty();
     board.children = elements;
     board.viewport = viewport || { zoom: 1 };
@@ -396,16 +386,11 @@ export const TauriFilePanel = () => {
   // 这里若误写会把白板内容写进文档文件
   const ensureCurrentFileSaved = async (): Promise<boolean> => {
     const dirtyId = currentFile ? getTauriTabId(currentFile, currentFileType) : null;
-    if (
-      !currentFile ||
-      !dirtyId ||
-      !dirty[dirtyId] ||
-      currentFileType !== 'drawnix'
-    ) {
+    if (!currentFile || !dirtyId || !dirty[dirtyId] || currentFileType !== 'drawnix') {
       return true;
     }
     try {
-      await saveToTauriFile(board, currentFile);
+      await saveToTauriFile(board, currentFile, 'drawnix');
       return true;
     } catch (error) {
       console.error('Failed to save current drawnix file:', error);
@@ -537,8 +522,7 @@ export const TauriFilePanel = () => {
       return;
     }
     // 同名不同类型文件路径相同，判别当前文档需连同文件类型
-    const isCurrentDoc =
-      currentFile === target.path && currentFileType === asFileType(target.ext);
+    const isCurrentDoc = currentFile === target.path && currentFileType === asFileType(target.ext);
     try {
       // 当前打开的文档被删除时先屏蔽其自动保存，
       // 否则文档编辑器卸载时的回写会把刚删除的文件重新创建出来
@@ -549,9 +533,12 @@ export const TauriFilePanel = () => {
       // 文件已删除：清掉防抖中的自动保存任务（suppress 兜底跳过写盘，
       // cancel 负责清掉残留定时器；删除失败时不 cancel，resume 后任务仍能自动写盘）
       cancelTauriAutoSave(target.path, asFileType(target.ext));
-      // 被删文件的草稿/视口一并清除：否则在原路径重建同名文件时会命中旧内容
-      void clearBoardDraft(target.path);
-      clearBoardViewport(target.path);
+      // 被删文件的草稿/视口一并清除：否则在原路径重建同名文件时会命中旧内容；
+      // 草稿/视口只属于白板文件，删除文档（md/table）时不得误清同名白板的数据
+      if (asFileType(target.ext) === 'drawnix') {
+        void clearBoardDraft(target.path);
+        clearBoardViewport(target.path);
+      }
       if (isCurrentDoc) {
         setCurrentTauriFile(null);
         clearAndLoad([]);
@@ -579,10 +566,7 @@ export const TauriFilePanel = () => {
     }
     try {
       // 分组内包含当前打开的文件时，同样先关闭文档并屏蔽自动保存
-      if (
-        currentFile &&
-        (currentFile === path || currentFile.startsWith(`${path}/`))
-      ) {
+      if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
         suppressTauriFileSave(currentFile, currentFileType);
         setCurrentTauriFile(null);
         clearAndLoad([]);
@@ -726,9 +710,7 @@ export const TauriFilePanel = () => {
     try {
       await renameTauriFolder(dirPath, name);
       // 同步分组路径前缀下所有引用卡片并广播刷新
-      syncFileRefCardPaths(board, [
-        { from: dirPath, to: newPath },
-      ]);
+      syncFileRefCardPaths(board, [{ from: dirPath, to: newPath }]);
       notifyTauriFilesChanged();
       if (docOldPath) {
         retargetCurrentDoc(`${newPath}${docOldPath.slice(dirPath.length)}`);
@@ -845,9 +827,7 @@ export const TauriFilePanel = () => {
     }
     moveTauriFileToDir(path, targetDir, fileType)
       .then(() => {
-        syncFileRefCardPaths(board, [
-          { from: path, to: newPath },
-        ]);
+        syncFileRefCardPaths(board, [{ from: path, to: newPath }]);
         notifyTauriFilesChanged();
         // 同步当前文件到新路径，避免后续保存写回旧路径
         if (isCurrentDoc) {
@@ -878,9 +858,7 @@ export const TauriFilePanel = () => {
     }
     moveTauriFolderToDir(path, targetDir)
       .then(() => {
-        syncFileRefCardPaths(board, [
-          { from: path, to: newPath },
-        ]);
+        syncFileRefCardPaths(board, [{ from: path, to: newPath }]);
         notifyTauriFilesChanged();
         if (docOldPath) {
           retargetCurrentDoc(`${newPath}${docOldPath.slice(path.length)}`);
@@ -1142,17 +1120,14 @@ export const TauriFilePanel = () => {
         }}
         {...dragHandlers(key)}
         className={classNames('tauri-file-panel__item', {
-          'tauri-file-panel__item--active':
-            path === currentFile && ext === currentFileType,
+          'tauri-file-panel__item--active': path === currentFile && ext === currentFileType,
           'tauri-file-panel__item--dragover': dragOverKey === key,
           'tauri-file-panel__item--dragging':
             dragItem?.id === path && dragItem.type === 'file' && dragItem.ext === ext,
         })}
         title={path}
         onClick={() => handleOpenFile(path, ext)}
-        onContextMenu={(event) =>
-          handleItemContextMenu(event, 'file', path, false, ext)
-        }
+        onContextMenu={(event) => handleItemContextMenu(event, 'file', path, false, ext)}
       >
         <span
           className={classNames(
@@ -1164,10 +1139,7 @@ export const TauriFilePanel = () => {
         </span>
         <span className="tauri-file-panel__item-name">{lastSeg(path)}</span>
         <span
-          className={classNames(
-            'tauri-file-panel__item-ext',
-            `tauri-file-panel__item-ext--${ext}`
-          )}
+          className={classNames('tauri-file-panel__item-ext', `tauri-file-panel__item-ext--${ext}`)}
         >
           {ext.toUpperCase()}
         </span>
@@ -1218,9 +1190,7 @@ export const TauriFilePanel = () => {
               className="tauri-file-panel__folder-main"
               title={dirPath}
               onClick={() => toggleFolder(dirPath)}
-              onContextMenu={(event) =>
-                handleItemContextMenu(event, 'folder', dirPath, false)
-              }
+              onContextMenu={(event) => handleItemContextMenu(event, 'folder', dirPath, false)}
             >
               <span
                 className={classNames('tauri-file-panel__chevron', {
@@ -1229,17 +1199,10 @@ export const TauriFilePanel = () => {
               >
                 {ChevronRightIcon}
               </span>
-              <span className="tauri-file-panel__folder-icon">
-                {FolderFilledIcon}
-              </span>
-              <span className="tauri-file-panel__folder-name">
-                {lastSeg(dirPath)}
-              </span>
+              <span className="tauri-file-panel__folder-icon">{FolderFilledIcon}</span>
+              <span className="tauri-file-panel__folder-name">{lastSeg(dirPath)}</span>
             </button>
-            <span
-              className="tauri-file-panel__folder-count"
-              aria-hidden="true"
-            >
+            <span className="tauri-file-panel__folder-count" aria-hidden="true">
               {orderedFilesIn(dirPath).length}
             </span>
             <button
@@ -1247,9 +1210,7 @@ export const TauriFilePanel = () => {
               className="tauri-file-panel__folder-more"
               title={t('workbench.tab.more')}
               aria-label={t('workbench.tab.more')}
-              onClick={(event) =>
-                handleItemContextMenu(event, 'folder', dirPath, false)
-              }
+              onClick={(event) => handleItemContextMenu(event, 'folder', dirPath, false)}
             >
               {MoreIcon}
             </button>
@@ -1285,519 +1246,488 @@ export const TauriFilePanel = () => {
       />
       {/* 面板留白收零：品牌头顶到窗口顶，底边线与页签栏严格对齐（各分区自带补回的内边距） */}
       <Island
-      padding={0}
-      className={classNames('tauri-file-panel', ATTACHED_ELEMENT_CLASS_NAME, {
-        'tauri-file-panel--drawer-open': sidebarOpen,
-      })}
-    >
-      {/* 品牌头（C1/D1）：logo + 思画/DRAWNIX + 窗口三钮；文件名已上移到页签栏。
+        padding={0}
+        className={classNames('tauri-file-panel', ATTACHED_ELEMENT_CLASS_NAME, {
+          'tauri-file-panel--drawer-open': sidebarOpen,
+        })}
+      >
+        {/* 品牌头（C1/D1）：logo + 思画/DRAWNIX + 窗口三钮；文件名已上移到页签栏。
           data-tauri-drag-region 标在容器与纯展示元素上（Tauri 仅认 mousedown 目标本身），
           按住品牌区空白 / logo / 文字均可拖动窗口，窗口三钮为子元素不受影响 */}
-      <div className="tauri-file-panel__header" data-tauri-drag-region="">
-        {/* 右上角品牌 logo：public/logo/logo.svg（自带圆角容器/磨砂/刷纹质感），
+        <div className="tauri-file-panel__header" data-tauri-drag-region="">
+          {/* 右上角品牌 logo：public/logo/logo.svg（自带圆角容器/磨砂/刷纹质感），
             不再叠加渐变底；img 自带 drag-region 属性（mousedown 目标即 img）保持窗口可拖动，
             draggable=false 防止原生图片拖拽抢先窗口拖动 */}
-        <img
-          className="tauri-file-panel__brand-logo"
-          src="/logo/logo.svg"
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          data-tauri-drag-region=""
-        />
-        <span className="tauri-file-panel__brand-text" data-tauri-drag-region="">
-          <span
-            className="tauri-file-panel__brand-name"
+          <img
+            className="tauri-file-panel__brand-logo"
+            src="/logo/logo.svg"
+            alt=""
+            aria-hidden="true"
+            draggable={false}
             data-tauri-drag-region=""
-          >
-            {t('workbench.brand.name')}
+          />
+          <span className="tauri-file-panel__brand-text" data-tauri-drag-region="">
+            <span className="tauri-file-panel__brand-name" data-tauri-drag-region="">
+              {t('workbench.brand.name')}
+            </span>
+            <span className="tauri-file-panel__brand-en" data-tauri-drag-region="">
+              {t('workbench.brand.en')}
+            </span>
           </span>
-          <span
-            className="tauri-file-panel__brand-en"
-            data-tauri-drag-region=""
-          >
-            {t('workbench.brand.en')}
-          </span>
-        </span>
-        <WindowControls onRequestClose={() => setExitConfirmOpen(true)} />
-        {/* 窄屏抽屉的「收起文件面板」（D6）：右箭头图标，避免与窗口关闭 × 混淆 */}
-        <button
-          type="button"
-          className="tauri-file-panel__drawer-collapse"
-          title={t('workbench.tab.collapsePanel')}
-          aria-label={t('workbench.tab.collapsePanel')}
-          onClick={() => setSidebarOpen(false)}
-        >
-          {ChevronRightIcon}
-        </button>
-      </div>
-      <div className="tauri-file-panel__toolbar">
-        {view === 'trash' ? (
+          <WindowControls onRequestClose={() => setExitConfirmOpen(true)} />
+          {/* 窄屏抽屉的「收起文件面板」（D6）：右箭头图标，避免与窗口关闭 × 混淆 */}
           <button
             type="button"
-            className="tauri-file-panel__new-button tauri-file-panel__new-button--danger"
-            disabled={trashFiles.length === 0}
-            onClick={() => setEmptyTrashOpen(true)}
+            className="tauri-file-panel__drawer-collapse"
+            title={t('workbench.tab.collapsePanel')}
+            aria-label={t('workbench.tab.collapsePanel')}
+            onClick={() => setSidebarOpen(false)}
           >
-            {t('filePanel.emptyTrash')}
+            {ChevronRightIcon}
           </button>
-        ) : (
-          // 蓝色拆分按钮（C2）：主按钮打开完整弹窗；悬停按钮任意位置直接展开类型菜单，
-          // 菜单锚定整个按钮、宽度与按钮一致；箭头点击保留手动开合。
-          // 注意：PopoverTrigger asChild 的子元素不能自带 ref（会覆盖 Floating UI 的
-          // reference ref 导致菜单定位归零），宽度测量 ref 放在外层包裹 div 上
-          <div
-            ref={splitRef}
-            className="tauri-file-panel__split-wrap"
-            onMouseEnter={openNewMenuOnHover}
-            onMouseLeave={scheduleCloseNewMenuOnHover}
-          >
-            <Popover
-              placement="bottom-start"
-              open={newMenuOpen}
-              onOpenChange={setNewMenuOpen}
+        </div>
+        <div className="tauri-file-panel__toolbar">
+          {view === 'trash' ? (
+            <button
+              type="button"
+              className="tauri-file-panel__new-button tauri-file-panel__new-button--danger"
+              disabled={trashFiles.length === 0}
+              onClick={() => setEmptyTrashOpen(true)}
             >
-              <PopoverTrigger asChild>
-                <div className="tauri-file-panel__split">
-                  <button
-                    type="button"
-                    className="tauri-file-panel__split-main"
-                    onClick={() => {
-                      setNewMenuOpen(false);
-                      openCreateDialog();
-                    }}
-                  >
-                    {PlusIcon}
-                    <span>{t('filePanel.newFile')}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="tauri-file-panel__split-arrow"
-                    title={t('workbench.panel.newMore')}
-                    aria-label={t('workbench.panel.newMore')}
-                    aria-haspopup="menu"
-                    onPointerDown={() => setNewMenuOpen(!newMenuOpen)}
-                  >
-                    {ChevronDownIcon}
-                  </button>
-                </div>
-              </PopoverTrigger>
-              {/* 菜单浮层 portal 到 .drawnix 根：插到 board container 会触发 plait 画布视口异常（局部不重绘发黑） */}
-              <PopoverContent
-                container={document.querySelector('.drawnix')}
-                style={{ width: splitWidth }}
-                onMouseEnter={openNewMenuOnHover}
-                onMouseLeave={scheduleCloseNewMenuOnHover}
-              >
-                <Menu
-                  onSelect={() => {
-                    setNewMenuOpen(false);
-                  }}
+              {t('filePanel.emptyTrash')}
+            </button>
+          ) : (
+            // 蓝色拆分按钮（C2）：主按钮打开完整弹窗；悬停按钮任意位置直接展开类型菜单，
+            // 菜单锚定整个按钮、宽度与按钮一致；箭头点击保留手动开合。
+            // 注意：PopoverTrigger asChild 的子元素不能自带 ref（会覆盖 Floating UI 的
+            // reference ref 导致菜单定位归零），宽度测量 ref 放在外层包裹 div 上
+            <div
+              ref={splitRef}
+              className="tauri-file-panel__split-wrap"
+              onMouseEnter={openNewMenuOnHover}
+              onMouseLeave={scheduleCloseNewMenuOnHover}
+            >
+              <Popover placement="bottom-start" open={newMenuOpen} onOpenChange={setNewMenuOpen}>
+                <PopoverTrigger asChild>
+                  <div className="tauri-file-panel__split">
+                    <button
+                      type="button"
+                      className="tauri-file-panel__split-main"
+                      onClick={() => {
+                        setNewMenuOpen(false);
+                        openCreateDialog();
+                      }}
+                    >
+                      {PlusIcon}
+                      <span>{t('filePanel.newFile')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tauri-file-panel__split-arrow"
+                      title={t('workbench.panel.newMore')}
+                      aria-label={t('workbench.panel.newMore')}
+                      aria-haspopup="menu"
+                      onPointerDown={() => setNewMenuOpen(!newMenuOpen)}
+                    >
+                      {ChevronDownIcon}
+                    </button>
+                  </div>
+                </PopoverTrigger>
+                {/* 菜单浮层 portal 到 .drawnix 根：插到 board container 会触发 plait 画布视口异常（局部不重绘发黑） */}
+                <PopoverContent
+                  container={document.querySelector('.drawnix')}
+                  style={{ width: splitWidth }}
+                  onMouseEnter={openNewMenuOnHover}
+                  onMouseLeave={scheduleCloseNewMenuOnHover}
                 >
-                  <MenuItem
-                    icon={
-                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--board">
-                        {BoardIcon}
-                      </span>
-                    }
-                    onSelect={() => openCreateDialog('board')}
-                  >
-                    {t('workbench.panel.newBoard')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={
-                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--table">
-                        {TableIcon}
-                      </span>
-                    }
-                    onSelect={() => openCreateDialog('table')}
-                  >
-                    {t('workbench.panel.newTable')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={
-                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--md">
-                        {MdIcon}
-                      </span>
-                    }
-                    onSelect={() => openCreateDialog('md')}
-                  >
-                    {t('workbench.panel.newMd')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={
-                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--folder">
-                        {FolderIcon}
-                      </span>
-                    }
+                  <Menu
                     onSelect={() => {
                       setNewMenuOpen(false);
-                      setNewFolderParent(null);
+                    }}
+                  >
+                    <MenuItem
+                      icon={
+                        <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--board">
+                          {BoardIcon}
+                        </span>
+                      }
+                      onSelect={() => openCreateDialog('board')}
+                    >
+                      {t('workbench.panel.newBoard')}
+                    </MenuItem>
+                    <MenuItem
+                      icon={
+                        <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--table">
+                          {TableIcon}
+                        </span>
+                      }
+                      onSelect={() => openCreateDialog('table')}
+                    >
+                      {t('workbench.panel.newTable')}
+                    </MenuItem>
+                    <MenuItem
+                      icon={
+                        <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--md">
+                          {MdIcon}
+                        </span>
+                      }
+                      onSelect={() => openCreateDialog('md')}
+                    >
+                      {t('workbench.panel.newMd')}
+                    </MenuItem>
+                    <MenuItem
+                      icon={
+                        <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--folder">
+                          {FolderIcon}
+                        </span>
+                      }
+                      onSelect={() => {
+                        setNewMenuOpen(false);
+                        setNewFolderParent(null);
+                        setNewFolderOpen(true);
+                        setNewFolderName('');
+                      }}
+                    >
+                      {t('workbench.panel.newFolder')}
+                    </MenuItem>
+                  </Menu>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>
+        <div
+          className="tauri-file-panel__list"
+          onDrop={(event) => {
+            event.preventDefault();
+            handleDropOnRoot(event);
+          }}
+          {...dragHandlers('list-root')}
+        >
+          {isEmpty && (
+            <div className="tauri-file-panel__empty">
+              {t(view === 'files' ? 'filePanel.empty' : 'filePanel.trashEmpty')}
+            </div>
+          )}
+          {view === 'files' && (
+            <>
+              {newFolderOpen && newFolderParent === null && renderNewFolderInput()}
+              {renderDirChildren('')}
+            </>
+          )}
+          {view === 'trash' &&
+            trashFiles.map((file) => (
+              <button
+                key={file.trashFile}
+                type="button"
+                className="tauri-file-panel__item"
+                title={`${file.path} · ${new Date(file.deletedAt).toLocaleString()}`}
+                onContextMenu={(event) =>
+                  handleItemContextMenu(event, 'file', file.trashFile, true, file.ext)
+                }
+              >
+                <span
+                  className={classNames(
+                    'tauri-file-panel__file-icon',
+                    `tauri-file-panel__file-icon--${file.ext}`
+                  )}
+                >
+                  {file.ext === 'table' ? TableIcon : file.ext === 'md' ? MdIcon : BoardIcon}
+                </span>
+                <span className="tauri-file-panel__item-name">{lastSeg(file.path)}</span>
+                <span
+                  className={classNames(
+                    'tauri-file-panel__item-ext',
+                    `tauri-file-panel__item-ext--${file.ext}`
+                  )}
+                >
+                  {file.ext.toUpperCase()}
+                </span>
+              </button>
+            ))}
+        </div>
+        {contextMenu && (
+          <div
+            className="tauri-file-panel__context-overlay"
+            onPointerDown={() => setContextMenu(null)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setContextMenu(null);
+            }}
+          >
+            <div
+              className="tauri-file-panel__context-menu"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              {contextMenu.kind === 'folder' ? (
+                <>
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item"
+                    onClick={() => {
+                      startRenameFolder(contextMenu.target);
+                      setContextMenu(null);
+                    }}
+                  >
+                    {t('filePanel.rename')}
+                  </button>
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item"
+                    onClick={() => {
+                      const parent = contextMenu.target;
+                      setContextMenu(null);
+                      setExpandedFolders((prev) => ({ ...prev, [parent]: true }));
+                      setNewFolderParent(parent);
                       setNewFolderOpen(true);
                       setNewFolderName('');
                     }}
                   >
-                    {t('workbench.panel.newFolder')}
-                  </MenuItem>
-                </Menu>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-      </div>
-      <div
-        className="tauri-file-panel__list"
-        onDrop={(event) => {
-          event.preventDefault();
-          handleDropOnRoot(event);
-        }}
-        {...dragHandlers('list-root')}
-      >
-        {isEmpty && (
-          <div className="tauri-file-panel__empty">
-            {t(view === 'files' ? 'filePanel.empty' : 'filePanel.trashEmpty')}
-          </div>
-        )}
-        {view === 'files' && (
-          <>
-            {newFolderOpen && newFolderParent === null && renderNewFolderInput()}
-            {renderDirChildren('')}
-          </>
-        )}
-        {view === 'trash' &&
-          trashFiles.map((file) => (
-            <button
-              key={file.trashFile}
-              type="button"
-              className="tauri-file-panel__item"
-              title={`${file.path} · ${new Date(file.deletedAt).toLocaleString()}`}
-              onContextMenu={(event) =>
-                handleItemContextMenu(event, 'file', file.trashFile, true, file.ext)
-              }
-            >
-              <span
-                className={classNames(
-                  'tauri-file-panel__file-icon',
-                  `tauri-file-panel__file-icon--${file.ext}`
-                )}
-              >
-                {file.ext === 'table'
-                  ? TableIcon
-                  : file.ext === 'md'
-                    ? MdIcon
-                    : BoardIcon}
-              </span>
-              <span className="tauri-file-panel__item-name">{lastSeg(file.path)}</span>
-              <span
-                className={classNames(
-                  'tauri-file-panel__item-ext',
-                  `tauri-file-panel__item-ext--${file.ext}`
-                )}
-              >
-                {file.ext.toUpperCase()}
-              </span>
-            </button>
-          ))}
-      </div>
-      {contextMenu && (
-        <div
-          className="tauri-file-panel__context-overlay"
-          onPointerDown={() => setContextMenu(null)}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setContextMenu(null);
-          }}
-        >
-          <div
-            className="tauri-file-panel__context-menu"
-            style={{ top: contextMenu.y, left: contextMenu.x }}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            {contextMenu.kind === 'folder' ? (
-              <>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() => {
-                    startRenameFolder(contextMenu.target);
-                    setContextMenu(null);
-                  }}
-                >
-                  {t('filePanel.rename')}
-                </button>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() => {
-                    const parent = contextMenu.target;
-                    setContextMenu(null);
-                    setExpandedFolders((prev) => ({ ...prev, [parent]: true }));
-                    setNewFolderParent(parent);
-                    setNewFolderOpen(true);
-                    setNewFolderName('');
-                  }}
-                >
-                  {t('filePanel.newSubFolder')}
-                </button>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() =>
-                    closeContextMenuAnd((target) =>
-                      setMoveTarget({ kind: 'folder', path: target })
-                    )
-                  }
-                >
-                  {t('filePanel.move')}
-                </button>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item tauri-file-panel__context-item--danger"
-                  onClick={() => closeContextMenuAnd((target) => setDeleteFolderTarget(target))}
-                >
-                  {t('filePanel.delete')}
-                </button>
-              </>
-            ) : contextMenu.trash ? (
-              <button
-                type="button"
-                className="tauri-file-panel__context-item"
-                onClick={() => closeContextMenuAnd(handleRestoreFile)}
-              >
-                {t('filePanel.restore')}
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() =>
-                    startRename(contextMenu.target, contextMenu.ext ?? 'drawnix')
-                  }
-                >
-                  {t('filePanel.rename')}
-                </button>
-                {contextMenu.ext !== 'table' && (
+                    {t('filePanel.newSubFolder')}
+                  </button>
                   <button
                     type="button"
                     className="tauri-file-panel__context-item"
                     onClick={() =>
                       closeContextMenuAnd((target) =>
-                        handleSaveFileAs(target, contextMenu.ext ?? 'drawnix')
+                        setMoveTarget({ kind: 'folder', path: target })
                       )
                     }
                   >
-                    {t('filePanel.saveAs')}
+                    {t('filePanel.move')}
                   </button>
-                )}
-                {contextMenu.ext === 'drawnix' && (
-                  <div
-                    className="tauri-file-panel__context-item-wrapper"
-                    onMouseEnter={() =>
-                      setContextMenu((cm) => cm && { ...cm, exportOpen: true })
-                    }
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item tauri-file-panel__context-item--danger"
+                    onClick={() => closeContextMenuAnd((target) => setDeleteFolderTarget(target))}
                   >
+                    {t('filePanel.delete')}
+                  </button>
+                </>
+              ) : contextMenu.trash ? (
+                <button
+                  type="button"
+                  className="tauri-file-panel__context-item"
+                  onClick={() => closeContextMenuAnd(handleRestoreFile)}
+                >
+                  {t('filePanel.restore')}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item"
+                    onClick={() => startRename(contextMenu.target, contextMenu.ext ?? 'drawnix')}
+                  >
+                    {t('filePanel.rename')}
+                  </button>
+                  {contextMenu.ext !== 'table' && (
                     <button
                       type="button"
                       className="tauri-file-panel__context-item"
                       onClick={() =>
-                        setContextMenu((cm) => cm && { ...cm, exportOpen: true })
+                        closeContextMenuAnd((target) =>
+                          handleSaveFileAs(target, contextMenu.ext ?? 'drawnix')
+                        )
                       }
                     >
-                      {t('filePanel.exportImage')}
-                      <span className="tauri-file-panel__submenu-arrow">▸</span>
+                      {t('filePanel.saveAs')}
                     </button>
-                    {contextMenu.exportOpen && (
-                      <div className="tauri-file-panel__context-submenu">
-                        <button
-                          type="button"
-                          className="tauri-file-panel__context-item"
-                          onClick={() => {
-                            const { target } = contextMenu;
-                            setContextMenu(null);
-                            handleExportImage(target, 'png');
-                          }}
-                        >
-                          {t('menu.exportImage.png')}
-                        </button>
-                        <button
-                          type="button"
-                          className="tauri-file-panel__context-item"
-                          onClick={() => {
-                            const { target } = contextMenu;
-                            setContextMenu(null);
-                            handleExportImage(target, 'svg');
-                          }}
-                        >
-                          {t('menu.exportImage.svg')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item"
-                  onClick={() =>
-                    closeContextMenuAnd((target) =>
-                      setMoveTarget({
-                        kind: 'file',
-                        path: target,
-                        ext: contextMenu.ext ?? 'drawnix',
-                      })
-                    )
-                  }
-                >
-                  {t('filePanel.move')}
-                </button>
-                <button
-                  type="button"
-                  className="tauri-file-panel__context-item tauri-file-panel__context-item--danger"
-                  onClick={() =>
-                    closeContextMenuAnd((target) =>
-                      setDeleteTarget({
-                        path: target,
-                        ext: contextMenu.ext ?? 'drawnix',
-                      })
-                    )
-                  }
-                >
-                  {t('filePanel.delete')}
-                </button>
-              </>
-            )}
+                  )}
+                  {contextMenu.ext === 'drawnix' && (
+                    <div
+                      className="tauri-file-panel__context-item-wrapper"
+                      onMouseEnter={() => setContextMenu((cm) => cm && { ...cm, exportOpen: true })}
+                    >
+                      <button
+                        type="button"
+                        className="tauri-file-panel__context-item"
+                        onClick={() => setContextMenu((cm) => cm && { ...cm, exportOpen: true })}
+                      >
+                        {t('filePanel.exportImage')}
+                        <span className="tauri-file-panel__submenu-arrow">▸</span>
+                      </button>
+                      {contextMenu.exportOpen && (
+                        <div className="tauri-file-panel__context-submenu">
+                          <button
+                            type="button"
+                            className="tauri-file-panel__context-item"
+                            onClick={() => {
+                              const { target } = contextMenu;
+                              setContextMenu(null);
+                              handleExportImage(target, 'png');
+                            }}
+                          >
+                            {t('menu.exportImage.png')}
+                          </button>
+                          <button
+                            type="button"
+                            className="tauri-file-panel__context-item"
+                            onClick={() => {
+                              const { target } = contextMenu;
+                              setContextMenu(null);
+                              handleExportImage(target, 'svg');
+                            }}
+                          >
+                            {t('menu.exportImage.svg')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item"
+                    onClick={() =>
+                      closeContextMenuAnd((target) =>
+                        setMoveTarget({
+                          kind: 'file',
+                          path: target,
+                          ext: contextMenu.ext ?? 'drawnix',
+                        })
+                      )
+                    }
+                  >
+                    {t('filePanel.move')}
+                  </button>
+                  <button
+                    type="button"
+                    className="tauri-file-panel__context-item tauri-file-panel__context-item--danger"
+                    onClick={() =>
+                      closeContextMenuAnd((target) =>
+                        setDeleteTarget({
+                          path: target,
+                          ext: contextMenu.ext ?? 'drawnix',
+                        })
+                      )
+                    }
+                  >
+                    {t('filePanel.delete')}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-      <SidebarFooter
-        trashActive={view === 'trash'}
-        onTrashToggle={() => switchView(view === 'files' ? 'trash' : 'files')}
-      ></SidebarFooter>
-      <CreateFileDialog
-        open={createDialog !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeCreateDialog();
-          }
-        }}
-        container={PlaitBoard.getBoardContainer(board)}
-        onCreate={handleCreateFile}
-        presetType={createDialog?.presetType ?? null}
-      ></CreateFileDialog>
-      <MoveEntryDialog
-        open={!!moveTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setMoveTarget(null);
-          }
-        }}
-        container={PlaitBoard.getBoardContainer(board)}
-        kind={moveTarget?.kind ?? 'file'}
-        path={moveTarget?.path ?? null}
-        onMove={handleMoveEntry}
-      ></MoveEntryDialog>
-      <Dialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-          }
-        }}
-      >
-        <DialogContent
-          className="clean-confirm"
+        )}
+        <SidebarFooter
+          trashActive={view === 'trash'}
+          onTrashToggle={() => switchView(view === 'files' ? 'trash' : 'files')}
+        ></SidebarFooter>
+        <CreateFileDialog
+          open={createDialog !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeCreateDialog();
+            }
+          }}
           container={PlaitBoard.getBoardContainer(board)}
-        >
-          <h2 className="clean-confirm__title">{t('deleteConfirm.title')}</h2>
-          <p className="clean-confirm__description">{t('deleteConfirm.description')}</p>
-          <div className="clean-confirm__actions">
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--cancel"
-              onClick={() => setDeleteTarget(null)}
-            >
-              {t('cleanConfirm.cancel')}
-            </button>
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--ok"
-              autoFocus
-              onClick={handleDeleteFile}
-            >
-              {t('deleteConfirm.ok')}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!deleteFolderTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteFolderTarget(null);
-          }
-        }}
-      >
-        <DialogContent
-          className="clean-confirm"
+          onCreate={handleCreateFile}
+          presetType={createDialog?.presetType ?? null}
+        ></CreateFileDialog>
+        <MoveEntryDialog
+          open={!!moveTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveTarget(null);
+            }
+          }}
           container={PlaitBoard.getBoardContainer(board)}
+          kind={moveTarget?.kind ?? 'file'}
+          path={moveTarget?.path ?? null}
+          onMove={handleMoveEntry}
+        ></MoveEntryDialog>
+        <Dialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteTarget(null);
+            }
+          }}
         >
-          <h2 className="clean-confirm__title">{t('folderDeleteConfirm.title')}</h2>
-          <p className="clean-confirm__description">
-            {t('folderDeleteConfirm.description')}
-          </p>
-          <div className="clean-confirm__actions">
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--cancel"
-              onClick={() => setDeleteFolderTarget(null)}
-            >
-              {t('cleanConfirm.cancel')}
-            </button>
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--ok"
-              autoFocus
-              onClick={handleDeleteFolder}
-            >
-              {t('deleteConfirm.ok')}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={emptyTrashOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEmptyTrashOpen(false);
-          }
-        }}
-      >
-        <DialogContent
-          className="clean-confirm"
-          container={PlaitBoard.getBoardContainer(board)}
+          <DialogContent className="clean-confirm" container={PlaitBoard.getBoardContainer(board)}>
+            <h2 className="clean-confirm__title">{t('deleteConfirm.title')}</h2>
+            <p className="clean-confirm__description">{t('deleteConfirm.description')}</p>
+            <div className="clean-confirm__actions">
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--cancel"
+                onClick={() => setDeleteTarget(null)}
+              >
+                {t('cleanConfirm.cancel')}
+              </button>
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--ok"
+                autoFocus
+                onClick={handleDeleteFile}
+              >
+                {t('deleteConfirm.ok')}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={!!deleteFolderTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteFolderTarget(null);
+            }
+          }}
         >
-          <h2 className="clean-confirm__title">{t('emptyTrashConfirm.title')}</h2>
-          <p className="clean-confirm__description">{t('emptyTrashConfirm.description')}</p>
-          <div className="clean-confirm__actions">
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--cancel"
-              onClick={() => setEmptyTrashOpen(false)}
-            >
-              {t('cleanConfirm.cancel')}
-            </button>
-            <button
-              type="button"
-              className="clean-confirm__button clean-confirm__button--ok"
-              autoFocus
-              onClick={handleEmptyTrash}
-            >
-              {t('emptyTrashConfirm.ok')}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Island>
+          <DialogContent className="clean-confirm" container={PlaitBoard.getBoardContainer(board)}>
+            <h2 className="clean-confirm__title">{t('folderDeleteConfirm.title')}</h2>
+            <p className="clean-confirm__description">{t('folderDeleteConfirm.description')}</p>
+            <div className="clean-confirm__actions">
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--cancel"
+                onClick={() => setDeleteFolderTarget(null)}
+              >
+                {t('cleanConfirm.cancel')}
+              </button>
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--ok"
+                autoFocus
+                onClick={handleDeleteFolder}
+              >
+                {t('deleteConfirm.ok')}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={emptyTrashOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEmptyTrashOpen(false);
+            }
+          }}
+        >
+          <DialogContent className="clean-confirm" container={PlaitBoard.getBoardContainer(board)}>
+            <h2 className="clean-confirm__title">{t('emptyTrashConfirm.title')}</h2>
+            <p className="clean-confirm__description">{t('emptyTrashConfirm.description')}</p>
+            <div className="clean-confirm__actions">
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--cancel"
+                onClick={() => setEmptyTrashOpen(false)}
+              >
+                {t('cleanConfirm.cancel')}
+              </button>
+              <button
+                type="button"
+                className="clean-confirm__button clean-confirm__button--ok"
+                autoFocus
+                onClick={handleEmptyTrash}
+              >
+                {t('emptyTrashConfirm.ok')}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </Island>
     </>
   );
 };

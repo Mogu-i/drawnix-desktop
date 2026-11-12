@@ -59,6 +59,7 @@ import { DocEditor } from './components/doc-editor/doc-editor';
 import { RestoreOpenedFile } from './components/restore-opened-file/restore-opened-file';
 import {
   getTauriFileState,
+  getTauriTabId,
   isTauriEnvironment,
   markTauriFileDirty,
   saveToTauriFile,
@@ -362,19 +363,23 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   !PlaitOperation.isSetSelectionOperation(op) &&
                   !PlaitOperation.isSetViewportOperation(op)
               );
-              if (hasContentChange) {
-                markTauriFileDirty();
-                // 未保存白板草稿按路径防抖写入 IndexedDB（Bug 1）：
+              // 白板隔离：活动文件不是白板（文档编辑器打开覆盖在其上）时，白板的
+              // 残余 change 不得给文档页签标脏，也不得把白板草稿/自动保存任务挂
+              // 到文档路径上（同名不同类型文件共用路径，曾致表格被误标脏、
+              // 白板内容错写到表格文件）
+              const { currentFile, fileType } = getTauriFileState();
+              if (hasContentChange && fileType === 'drawnix') {
+                markTauriFileDirty(currentFile ?? undefined, 'drawnix');
+                // 未保存白板草稿按复合键防抖写入 IndexedDB（Bug 1）：
                 // 不挂在 markTauriFileDirty 里——它受 500ms 抑制窗口影响会漏写；
                 // web 端无 currentFile，条件不满足自然跳过
-                const { currentFile, fileType } = getTauriFileState();
-                if (board && isTauriEnvironment() && currentFile && fileType === 'drawnix') {
+                if (board && isTauriEnvironment() && currentFile) {
                   scheduleBoardDraft(currentFile, serializeAsJSON(board));
                   // 自动保存（所有文件）：编辑停止 1s 后自动写盘，无需手动 Ctrl+S；
                   // 写盘成功由 saveToTauriFile 清脏清草稿（橙点消失），失败保留橙点，
                   // 草稿兜底不受影响；任务惰性取 board 最新内容
                   scheduleTauriAutoSave(currentFile, 'drawnix', () =>
-                    saveToTauriFile(board, currentFile)
+                    saveToTauriFile(board, currentFile, 'drawnix')
                   );
                 }
               }
@@ -418,7 +423,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   </Board>
                   {isDocOpen && currentFile && (
                     <DocEditor
-                      key={currentFile}
+                      // 复合键：同名不同类型页签互切时编辑器按身份重挂载，
+                      // 避免残留上一类型编辑器的输入状态与卸载回写
+                      key={getTauriTabId(currentFile, currentFileType)}
                       path={currentFile}
                       fileType={currentFileType as 'md' | 'table'}
                     ></DocEditor>

@@ -19,14 +19,13 @@ import {
 } from './type';
 import {
   getTauriFileState,
+  isTauriFileDirty,
   saveToTauriFile,
   setCurrentTauriFile,
 } from '../../data/tauri-file';
 
 const getCenterPoint = (board: PlaitBoard): Point => {
-  const containerRect = PlaitBoard.getBoardContainer(
-    board
-  ).getBoundingClientRect();
+  const containerRect = PlaitBoard.getBoardContainer(board).getBoundingClientRect();
   const zoom = board.viewport.zoom;
   const origination = getViewportOrigination(board);
   const centerX = (origination?.[0] ?? 0) + containerRect.width / 2 / zoom;
@@ -104,7 +103,9 @@ export const insertFileRefCard = (
   return card;
 };
 
-/** 双击文件引用卡片：进入对应文件的文档编辑器；当前白板有未保存修改时先保存 */
+/** 双击文件引用卡片：进入对应文件的文档编辑器；当前白板有未保存修改时先保存。
+ *  保存显式按白板身份（path + drawnix）进行，并用复合键判脏，
+ *  避免同名文档页签的脏状态触发白板写盘 */
 export const openFileRefCardEditor = (board: PlaitBoard, element: CardElement) => {
   const { filePath, fileType } = element;
   if (!filePath || !fileType) {
@@ -112,8 +113,12 @@ export const openFileRefCardEditor = (board: PlaitBoard, element: CardElement) =
   }
   const open = () => setCurrentTauriFile(filePath, fileType);
   const state = getTauriFileState();
-  if (state.currentFile && state.fileType === 'drawnix' && state.dirty) {
-    saveToTauriFile(board)
+  if (
+    state.currentFile &&
+    state.fileType === 'drawnix' &&
+    isTauriFileDirty(state.currentFile, 'drawnix')
+  ) {
+    saveToTauriFile(board, state.currentFile, 'drawnix')
       .then(open)
       .catch((error) => {
         console.error('Failed to save current drawnix file:', error);

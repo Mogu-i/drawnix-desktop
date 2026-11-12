@@ -7,11 +7,8 @@ import MenuItemLink from '../../menu/menu-item-link';
 import { saveAsPng, saveAsSvg } from '../../../utils/image';
 import { useDrawnix } from '../../../hooks/use-drawnix';
 import { useI18n } from '../../../i18n';
-import {
-  isTauriEnvironment,
-  saveToTauriFile,
-  useTauriFileState,
-} from '../../../data/tauri-file';
+import { isTauriEnvironment, useTauriFileState } from '../../../data/tauri-file';
+import { useTauriFileActions } from '../../../hooks/use-tauri-file-actions';
 import Menu from '../../menu/menu';
 import MenuItemContentSwitch from '../../menu/menu-item-content-switch';
 import { useContext, useState } from 'react';
@@ -48,10 +45,10 @@ export const SaveToFile = () => {
 SaveToFile.displayName = 'SaveToFile';
 
 export const SaveTauriFile = () => {
-  const board = useBoard();
-  const { showToast } = useDrawnix();
   const { t } = useI18n();
   const { currentFile, dirty } = useTauriFileState();
+  // 统一保存入口：按活动文件类型分派（白板/Markdown/表格），不再直连 saveToTauriFile
+  const { saveCurrentFile } = useTauriFileActions();
   const [isTauri] = useState(() => isTauriEnvironment());
   if (!isTauri || !currentFile) {
     return null;
@@ -60,13 +57,7 @@ export const SaveTauriFile = () => {
     <MenuItem
       data-testid="tauri-save-button"
       onSelect={async () => {
-        try {
-          await saveToTauriFile(board);
-          showToast({ message: t('toast.tauriFile.saved') });
-        } catch (error) {
-          console.error('Failed to save drawnix file:', error);
-          showToast({ message: t('toast.tauriFile.saveFailed') });
-        }
+        await saveCurrentFile();
       }}
       icon={SaveFileIcon}
       aria-label={t('menu.saveTauriFile')}

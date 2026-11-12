@@ -186,7 +186,7 @@ export const useTauriFileActions = () => {
     const fileType = state.fileType;
     const promise =
       fileType === 'drawnix'
-        ? saveToTauriFile(board, path)
+        ? saveToTauriFile(board, path, 'drawnix')
         : Promise.resolve().then(() => {
             const draft = getTauriDocDraft(path, fileType);
             if (draft !== null) {

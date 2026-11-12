@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import localforage from 'localforage';
 import {
   clearBoardDraft,
   clearBoardDraftsByPrefix,
@@ -132,6 +133,67 @@ describe('isUsableViewport', () => {
     expect(isUsableViewport({ zoom: Number.NaN })).toBe(false);
     expect(isUsableViewport({ zoom: Infinity })).toBe(false);
     expect(isUsableViewport({ zoom: '2' })).toBe(false);
+  });
+});
+
+describe('board-draft composite key & legacy migration', () => {
+  const LEGACY_DRAFT_PATH = 'spec-legacy/draft';
+  const LEGACY_VIEWPORT_PATH = 'spec-legacy/viewport';
+  // 与模块内部同一底层存储（name/storeName 一致），用于直接预置旧版纯路径键
+  const legacyStore = localforage.createInstance({
+    name: 'Drawnix',
+    storeName: 'board_drafts',
+  });
+  const COMPOSITE_DRAFT_KEY = `${LEGACY_DRAFT_PATH}:drawnix`;
+  const LEGACY_VIEWPORT_KEY = `drawnix_board_viewport:${LEGACY_VIEWPORT_PATH}`;
+  const COMPOSITE_VIEWPORT_KEY = `drawnix_board_viewport:${LEGACY_VIEWPORT_PATH}:drawnix`;
+
+  afterEach(async () => {
+    await clearBoardDraft(LEGACY_DRAFT_PATH);
+    clearBoardViewport(LEGACY_VIEWPORT_PATH);
+  });
+
+  it('migrates a legacy path-keyed draft to the composite key on read', async () => {
+    // 升级前写入的数据：键为纯路径
+    await legacyStore.setItem(LEGACY_DRAFT_PATH, '{"legacy":true}');
+
+    await expect(getBoardDraft(LEGACY_DRAFT_PATH)).resolves.toBe('{"legacy":true}');
+    // 读取即迁移：复合键有值、旧键清除（保存后旧草稿不会复活）
+    await expect(legacyStore.getItem(COMPOSITE_DRAFT_KEY)).resolves.toBe('{"legacy":true}');
+    await expect(legacyStore.getItem(LEGACY_DRAFT_PATH)).resolves.toBeNull();
+  });
+
+  it('migrates a legacy path-keyed viewport to the composite key on read', () => {
+    window.localStorage.setItem(
+      LEGACY_VIEWPORT_KEY,
+      JSON.stringify({ zoom: 1.5, origination: [1, 2] })
+    );
+
+    expect(getBoardViewport(LEGACY_VIEWPORT_PATH)).toEqual({ zoom: 1.5, origination: [1, 2] });
+    expect(window.localStorage.getItem(COMPOSITE_VIEWPORT_KEY)).toBe(
+      JSON.stringify({ zoom: 1.5, origination: [1, 2] })
+    );
+    expect(window.localStorage.getItem(LEGACY_VIEWPORT_KEY)).toBeNull();
+  });
+
+  it('clears both the composite key and the legacy key so saved drafts stay dead', async () => {
+    await legacyStore.setItem(LEGACY_DRAFT_PATH, '{"old":true}');
+
+    await clearBoardDraft(LEGACY_DRAFT_PATH);
+
+    await expect(getBoardDraft(LEGACY_DRAFT_PATH)).resolves.toBeNull();
+    await expect(legacyStore.getItem(LEGACY_DRAFT_PATH)).resolves.toBeNull();
+  });
+
+  it('renames a legacy path-keyed draft into the composite key of the target path', async () => {
+    await legacyStore.setItem(LEGACY_DRAFT_PATH, '{"moved":true}');
+
+    await renameBoardDraft(LEGACY_DRAFT_PATH, 'spec-legacy/moved');
+
+    await expect(getBoardDraft('spec-legacy/moved')).resolves.toBe('{"moved":true}');
+    await expect(getBoardDraft(LEGACY_DRAFT_PATH)).resolves.toBeNull();
+    await expect(legacyStore.getItem(LEGACY_DRAFT_PATH)).resolves.toBeNull();
+    await clearBoardDraft('spec-legacy/moved');
   });
 });
 
