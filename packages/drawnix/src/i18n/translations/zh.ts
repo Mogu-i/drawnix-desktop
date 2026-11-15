@@ -96,6 +96,7 @@ const zhTranslations: Translations = {
   'toast.tauriFile.createFolderFailed': '创建文件夹失败，目标文件夹可能已存在',
   'toast.tauriFile.draftRestored': '已恢复上次未保存的编辑',
   'toast.tauriFile.draftCorrupted': '草稿无法读取，已加载磁盘版本',
+  'toast.tauriFile.draftConflict': '文件内容已在应用外被修改，已加载磁盘最新版本',
   'toast.imageUnsupported': '不支持的图片格式，无法粘贴',
   'toast.imageFetchFallback': '网页图片获取失败，已粘贴为文字',
 

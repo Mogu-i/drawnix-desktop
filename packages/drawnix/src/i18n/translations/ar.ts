@@ -103,6 +103,7 @@ const arTranslations: Translations = {
     'فشل إنشاء المجلد، قد يكون هناك مجلد بنفس الاسم موجودًا بالفعل',
   'toast.tauriFile.draftRestored': 'تم استعادة التعديلات غير المحفوظة',
   'toast.tauriFile.draftCorrupted': 'تعذّرت قراءة المسودة؛ تم تحميل النسخة المحفوظة على القرص',
+  'toast.tauriFile.draftConflict': 'تم تعديل الملف خارج التطبيق؛ تم تحميل أحدث نسخة من القرص',
   'toast.imageUnsupported': 'صيغة الصورة غير مدعومة، لا يمكن اللصق',
   'toast.imageFetchFallback': 'تعذر جلب صورة الويب؛ تم اللصق كنص',
 

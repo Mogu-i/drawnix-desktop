@@ -5,6 +5,7 @@ import { useDrawnix } from './use-drawnix';
 import { useI18n } from '../i18n';
 import { formatTemplate } from '../i18n/format';
 import {
+  clearTauriDocDraft,
   clearTauriFileDirty,
   getTauriBoardSnapshot,
   getTauriDocDraft,
@@ -25,8 +26,13 @@ import {
   getBoardViewport,
   isUsableViewport,
 } from '../data/board-draft';
-import { flushTauriAutoSaveNow } from '../data/tauri-auto-save';
+import { cancelTauriAutoSave, flushTauriAutoSaveNow } from '../data/tauri-auto-save';
+import { isDocDraftStale } from '../data/doc-draft';
 import { migrateLegacyBoardData } from '../plugins/card/with-card';
+
+/** 手动保存时草稿过期的哨兵错误：磁盘已被应用外改动，过期草稿不得写盘（G3），
+ *  外层 catch 识别后提示冲突并按失败返回，不误报保存成功 */
+class DocDraftConflictError extends Error {}
 
 /** openFile 结果：restored 表示画布加载成功；fromDraft 表示内容来自未保存草稿
  *  （供启动恢复决定是否保留脏橙点并提示用户） */
@@ -187,12 +193,25 @@ export const useTauriFileActions = () => {
     const promise =
       fileType === 'drawnix'
         ? saveToTauriFile(board, path, 'drawnix')
-        : Promise.resolve().then(() => {
+        : Promise.resolve().then(async () => {
             const draft = getTauriDocDraft(path, fileType);
-            if (draft !== null) {
-              return saveTauriDocFile(path, draft, fileType);
+            if (draft === null) {
+              // 无草稿说明该文件没有未保存的修改，无需写盘
+              return;
             }
-            // 无草稿说明该文件没有未保存的修改，无需写盘
+            // 手动保存防覆盖：写盘前读一次磁盘比对草稿基线，磁盘已被应用外
+            // 改动时过期草稿绝不写回磁盘，清草稿并按冲突失败返回（G3）
+            const diskContent = await readTauriFile(path, fileType);
+            if (isDocDraftStale(draft, diskContent)) {
+              clearTauriDocDraft(path, fileType);
+              // 已排队的自动保存任务持有的同源内容一并取消，避免 1s 后
+              // 自动写盘绕过本次拦截把过期内容写回磁盘
+              cancelTauriAutoSave(path, fileType);
+              throw new DocDraftConflictError(
+                `draft is stale (disk changed outside the app): ${path}`
+              );
+            }
+            await saveTauriDocFile(path, draft.content, fileType);
           });
     return promise
       .then(() => {
@@ -202,6 +221,10 @@ export const useTauriFileActions = () => {
         return true;
       })
       .catch((error) => {
+        if (error instanceof DocDraftConflictError) {
+          showToast({ message: t('toast.tauriFile.draftConflict') });
+          return false;
+        }
         console.error('Failed to save current file:', error);
         showToast({ message: t('toast.tauriFile.saveFailed') });
         return false;

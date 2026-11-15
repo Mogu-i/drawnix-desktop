@@ -3,25 +3,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarkdownEditor } from './markdown-editor';
 
 const readTauriFileMock = vi.fn();
+const resolveDocContentMock = vi.fn();
+const isTauriFileDirtyMock = vi.fn(() => false);
+const showToastMock = vi.fn();
+const markLoadedMock = vi.fn();
 
 vi.mock('../../data/tauri-file', () => ({
   readTauriFile: (...args: unknown[]) => readTauriFileMock(...args),
   writeTauriFile: vi.fn().mockResolvedValue(undefined),
-  // 文档草稿读取：返回 null 表示无草稿，编辑器回退 readTauriFile 加载磁盘内容
-  getTauriDocDraft: vi.fn(() => null),
-  markTauriFileDirty: vi.fn(),
-  clearTauriFileDirty: vi.fn(),
+  // 统一加载决策点：编辑器不再自行拼「草稿优先」三元表达式
+  resolveDocContent: (...args: unknown[]) => resolveDocContentMock(...args),
+  isTauriFileDirty: (...args: unknown[]) => isTauriFileDirtyMock(...args),
+  TAURI_FILES_CHANGED_EVENT: 'drawnix:tauri-files-changed',
 }));
 
 vi.mock('./use-doc-auto-save', () => {
   // 回调引用必须稳定，否则编辑器会因依赖变化反复重新加载文件
   const scheduleSave = () => {};
-  const markLoaded = () => {};
-  return { useDocAutoSave: () => ({ scheduleSave, markLoaded }) };
+  return { useDocAutoSave: () => ({ scheduleSave, markLoaded: markLoadedMock }) };
 });
 
+vi.mock('../../hooks/use-drawnix', () => ({
+  useDrawnix: () => ({ showToast: showToastMock }),
+}));
+
+// t 引用必须稳定：loadDoc 把 t 放进依赖数组，每次渲染新建函数会反复触发加载
+const tMock = (key: string) => key;
 vi.mock('../../i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: tMock }),
 }));
 
 const getAllCheckboxes = () =>
@@ -45,6 +54,15 @@ describe('MarkdownEditor task checkbox interaction', () => {
     window.localStorage.clear();
     readTauriFileMock.mockReset();
     readTauriFileMock.mockResolvedValue('- [ ] 任务一\n- [ ] 任务二\n- [ ] 任务三');
+    resolveDocContentMock.mockReset();
+    // 默认无草稿：resolveDocContent 返回磁盘内容，content 与 diskContent 一致
+    resolveDocContentMock.mockImplementation(async () => {
+      const diskContent = await readTauriFileMock();
+      return { content: diskContent, diskContent, fromDraft: false, conflict: false };
+    });
+    isTauriFileDirtyMock.mockReset().mockReturnValue(false);
+    showToastMock.mockReset();
+    markLoadedMock.mockReset();
   });
 
   it('keeps all checkboxes clickable while toggling tasks', async () => {
@@ -91,5 +109,42 @@ describe('MarkdownEditor task checkbox interaction', () => {
     await waitFor(() => {
       expect(textarea.value).toBe('- [ ] 任务一\n- [x] 任务二\n- [ ] 任务三\n');
     });
+  });
+
+  it('renders the disk version when a draft exists but the disk changed outside (G1/G3)', async () => {
+    // 磁盘被应用外改动：过期草稿失效，显示磁盘内容而不是旧草稿
+    resolveDocContentMock.mockResolvedValue({
+      content: '- [x] 磁盘最新内容',
+      diskContent: '- [x] 磁盘最新内容',
+      fromDraft: false,
+      conflict: true,
+    });
+    render(<MarkdownEditor path="demo" />);
+    await waitFor(() => {
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+      expect(textarea.value).toBe('- [x] 磁盘最新内容');
+    });
+    // 冲突不静默切换：toast 提示用户
+    expect(showToastMock).toHaveBeenCalledWith({ message: 'toast.tauriFile.draftConflict' });
+    // 基线永远是磁盘原文（而非草稿内容）
+    expect(markLoadedMock).toHaveBeenCalledWith('- [x] 磁盘最新内容');
+  });
+
+  it('renders the draft when its baseline still matches the disk (G2)', async () => {
+    // 磁盘未被改动：未保存草稿仍优先恢复，不提示冲突
+    resolveDocContentMock.mockResolvedValue({
+      content: '- [x] 未保存的草稿',
+      diskContent: '- [ ] 磁盘版本',
+      fromDraft: true,
+      conflict: false,
+    });
+    render(<MarkdownEditor path="demo" />);
+    await waitFor(() => {
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+      expect(textarea.value).toBe('- [x] 未保存的草稿');
+    });
+    expect(showToastMock).not.toHaveBeenCalled();
+    // 基线仍取磁盘原文，草稿恢复后继续编辑以此判定过期
+    expect(markLoadedMock).toHaveBeenCalledWith('- [ ] 磁盘版本');
   });
 });

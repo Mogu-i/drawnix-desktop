@@ -96,6 +96,7 @@ const enTranslations: Translations = {
     'Failed to create folder. A folder with the same name may already exist',
   'toast.tauriFile.draftRestored': 'Restored your unsaved edits',
   'toast.tauriFile.draftCorrupted': 'Draft could not be read; loaded the version from disk',
+  'toast.tauriFile.draftConflict': 'The file was modified outside the app; loaded the latest version from disk',
   'toast.imageUnsupported': 'Unsupported image format. Cannot paste the image',
   'toast.imageFetchFallback': 'Could not fetch the web image; pasted as text instead',
   // Language

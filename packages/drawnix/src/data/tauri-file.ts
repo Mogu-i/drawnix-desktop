@@ -9,6 +9,7 @@ import {
   renameBoardDraft,
   renameBoardViewport,
 } from './board-draft';
+import { isDocDraftStale, type DocDraft } from './doc-draft';
 
 export type TauriTreeFileEntry = {
   /** 相对路径（不含扩展名），如 `分组A/未命名` */
@@ -241,6 +242,21 @@ export const notifyTauriFilesChanged = () => {
   window.dispatchEvent(new CustomEvent(TAURI_FILES_CHANGED_EVENT));
 };
 
+/** 文档（md/table）写盘成功后广播：payload 带本次写入的路径/类型/内容，
+ *  编辑器订阅后把草稿哈希基线更新为「本次写入磁盘内容」，避免保存成功后
+ *  继续编辑产生的新草稿因基线陈旧被误判为过期 */
+export const DOC_DISK_SYNCED_EVENT = 'drawnix:doc-disk-synced';
+
+export type DocDiskSyncedDetail = {
+  path: string;
+  fileType: 'md' | 'table';
+  content: string;
+};
+
+export const notifyDocDiskSynced = (detail: DocDiskSyncedDetail) => {
+  window.dispatchEvent(new CustomEvent(DOC_DISK_SYNCED_EVENT, { detail }));
+};
+
 // ---------------------------------------------------------------------------
 // 当前文件状态（模块级 store，供菜单保存项与文件面板共享）
 // ---------------------------------------------------------------------------
@@ -257,8 +273,8 @@ type PersistedWorkbenchState = {
   /** 活动页签身份：「路径:类型」复合键（getTauriTabId） */
   activeId: string | null;
   dirty: Record<string, true>;
-  /** 文档草稿：键为「路径:类型」复合键（仅 md/table） */
-  docContents: Record<string, string>;
+  /** 文档草稿：键为「路径:类型」复合键（仅 md/table），值为带磁盘基线的 DocDraft */
+  docContents: Record<string, DocDraft>;
 };
 
 const EMPTY_PERSISTED: PersistedWorkbenchState = {
@@ -329,15 +345,28 @@ const loadPersistedWorkbench = (): PersistedWorkbenchState => {
         }
       }
     }
-    const docContents: Record<string, string> = {};
+    const docContents: Record<string, DocDraft> = {};
     if (parsed.docContents && typeof parsed.docContents === 'object') {
       for (const [key, value] of Object.entries(parsed.docContents)) {
-        if (typeof value !== 'string') {
+        const migrated = migrateTabKey(key, tabs);
+        if (!migrated || migrated.fileType === 'drawnix') {
           continue;
         }
-        const migrated = migrateTabKey(key, tabs);
-        if (migrated && migrated.fileType !== 'drawnix') {
-          docContents[migrated.id] = value;
+        // 旧版草稿值为纯字符串：没有磁盘基线无从校验过期，转成 baseHash 为空的
+        // DocDraft，后续加载时必然判为过期（磁盘版本优先），不再无条件生效
+        if (typeof value === 'string') {
+          docContents[migrated.id] = { content: value, baseHash: '', updatedAt: 0 };
+          continue;
+        }
+        // 新版结构逐字段校验：非法记录跳过，防止残留坏数据让整页渲染中断
+        if (
+          value &&
+          typeof value === 'object' &&
+          typeof (value as DocDraft).content === 'string' &&
+          typeof (value as DocDraft).baseHash === 'string' &&
+          typeof (value as DocDraft).updatedAt === 'number'
+        ) {
+          docContents[migrated.id] = value as DocDraft;
         }
       }
     }
@@ -365,8 +394,9 @@ const loadPersistedWorkbench = (): PersistedWorkbenchState => {
 
 const persisted = loadPersistedWorkbench();
 
-/** 文档草稿缓存（Markdown/表格）：编辑中的内容，切换页签与刷新后恢复 */
-const docDrafts: Record<string, string> = { ...persisted.docContents };
+/** 文档草稿缓存（Markdown/表格）：编辑中的内容 + 磁盘基线哈希，
+ *  切换页签与刷新后恢复；基线用于判定磁盘是否已被应用外改动 */
+const docDrafts: Record<string, DocDraft> = { ...persisted.docContents };
 
 /** 白板内容快照：白板页签间切换时暂存未保存内容（内存级，刷新后回退磁盘版本）；
  *  键为「路径:drawnix」复合身份——同名不同类型文件共用路径，纯路径键会让文档
@@ -399,6 +429,15 @@ const emit = () => {
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
+const buildPersistPayload = (): PersistedWorkbenchState => ({
+  openTabs: state.openTabs,
+  // 活动页签身份为复合键：同名不同类型文件共用路径，
+  // 只存路径会让重启恢复命中第一个同名页签而非真正活动的那一个
+  activeId: state.currentFile ? getTauriTabId(state.currentFile, state.fileType) : null,
+  dirty: state.dirty,
+  docContents: docDrafts,
+});
+
 /** 防抖持久化页签/活动文件/脏标记/草稿，供下次启动恢复 */
 const persistWorkbench = () => {
   if (persistTimer) {
@@ -407,19 +446,25 @@ const persistWorkbench = () => {
   persistTimer = setTimeout(() => {
     persistTimer = null;
     try {
-      const payload: PersistedWorkbenchState = {
-        openTabs: state.openTabs,
-        // 活动页签身份为复合键：同名不同类型文件共用路径，
-        // 只存路径会让重启恢复命中第一个同名页签而非真正活动的那一个
-        activeId: state.currentFile ? getTauriTabId(state.currentFile, state.fileType) : null,
-        dirty: state.dirty,
-        docContents: docDrafts,
-      };
-      window.localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify(buildPersistPayload()));
     } catch {
       // 持久化失败仅影响下次启动恢复，不打断当前使用
     }
   }, 300);
+};
+
+/** 立即持久化工作台状态（取消防抖）：草稿删除/保存成功后必须同步落盘，
+ *  否则 300ms 防抖窗口内退出进程会丢掉这次删除，残留草稿在下次启动复活 */
+export const flushPersistWorkbenchNow = () => {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  try {
+    window.localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify(buildPersistPayload()));
+  } catch {
+    // 持久化失败仅影响下次启动恢复，不打断当前使用
+  }
 };
 
 const setState = (partial: Partial<TauriFileState>) => {
@@ -691,6 +736,12 @@ export const saveTauriDocFile = async (
   await writeTauriFile(path, content, fileType);
   delete docDrafts[getTauriTabId(path, fileType)];
   clearTauriFileDirty(path, fileType);
+  // 草稿删除立即持久化：保存成功后立刻退出进程不丢这次删除（残留草稿
+  // 会在下次启动被当成未保存修改复活）
+  flushPersistWorkbenchNow();
+  // 广播磁盘已与本次写入同步：编辑器订阅后更新草稿哈希基线（保存成功后
+  // 继续编辑产生的新草稿以最新磁盘版本为基准）
+  notifyDocDiskSynced({ path, fileType, content });
 };
 
 /** 收起页签：清除该文件的未保存痕迹；收起活动页签时切到相邻页签或欢迎页。
@@ -721,6 +772,8 @@ export const closeTauriTab = (path: string, fileType: TauriFileType): TauriOpenT
     fileType: wasActive ? (nextTab?.fileType ?? DEFAULT_FILE_TYPE) : state.fileType,
     dirty,
   });
+  // 收起会删除脏标记与草稿：立即持久化，防抖窗口内退出不复活已收起的草稿
+  flushPersistWorkbenchNow();
   if (wasActive && nextTab) {
     suppressDirtyUntil = Date.now() + 500;
   }
@@ -780,13 +833,29 @@ export const renameTauriTabPath = (from: string, to: string, fileType: TauriFile
 
 // ---- 文档草稿与白板快照存取（编辑器加载/切换页签时使用） ----
 
-export const getTauriDocDraft = (path: string, fileType: 'md' | 'table'): string | null => {
+export const getTauriDocDraft = (path: string, fileType: 'md' | 'table'): DocDraft | null => {
   const key = getTauriTabId(path, fileType);
-  return Object.prototype.hasOwnProperty.call(docDrafts, key) ? docDrafts[key] : null;
+  const draft = Object.prototype.hasOwnProperty.call(docDrafts, key) ? docDrafts[key] : null;
+  if (draft === null) {
+    return null;
+  }
+  // 第二道防线：无脏标记的残留草稿（保存后清除失败、迁移残留等）不生效，
+  // 读取时即清除并立即持久化，避免过期快照在下次加载复活
+  if (!state.dirty[key]) {
+    delete docDrafts[key];
+    flushPersistWorkbenchNow();
+    return null;
+  }
+  return draft;
 };
 
-export const setTauriDocDraft = (path: string, fileType: 'md' | 'table', content: string) => {
-  docDrafts[getTauriTabId(path, fileType)] = content;
+export const setTauriDocDraft = (
+  path: string,
+  fileType: 'md' | 'table',
+  content: string,
+  baseHash: string
+) => {
+  docDrafts[getTauriTabId(path, fileType)] = { content, baseHash, updatedAt: Date.now() };
   persistWorkbench();
 };
 
@@ -794,8 +863,51 @@ export const clearTauriDocDraft = (path: string, fileType: 'md' | 'table') => {
   const key = getTauriTabId(path, fileType);
   if (Object.prototype.hasOwnProperty.call(docDrafts, key)) {
     delete docDrafts[key];
-    persistWorkbench();
+    // 删除立即持久化：防抖窗口内退出不复活草稿
+    flushPersistWorkbenchNow();
   }
+};
+
+export type ResolvedDocContent = {
+  /** 最终应渲染的内容 */
+  content: string;
+  /** 本次读到的磁盘原文，供 markLoaded 计算基线 */
+  diskContent: string;
+  /** 内容是否来自未保存草稿 */
+  fromDraft: boolean;
+  /** 磁盘已被外部改动（过期草稿失效）或草稿为无脏残留，已回退磁盘版本 */
+  conflict: boolean;
+};
+
+/**
+ * 文档（Markdown/表格）加载的唯一决策点（两种编辑器共用，不得各自拼
+ * 「草稿优先」三元表达式）：总是先读一次磁盘，再按基线判定草稿是否仍有效——
+ * - 无草稿（含无脏标记残留草稿，getTauriDocDraft 已拦截）：返回磁盘内容；
+ * - 草稿过期（磁盘已被应用外改动）：清除草稿与遗留脏标记（均立即持久化），
+ *   返回磁盘内容并标记 conflict，调用方提示用户；
+ * - 草稿仍有效（磁盘未被改动）：返回草稿内容，未保存编辑优先。
+ * 读盘失败直接向上抛出（编辑器走 setLoadFailed 展示加载失败），此时草稿
+ * 保留待下次成功读取后再判定，不做任何写盘。
+ */
+export const resolveDocContent = async (
+  path: string,
+  fileType: 'md' | 'table'
+): Promise<ResolvedDocContent> => {
+  if (fileType !== 'md' && fileType !== 'table') {
+    throw new Error(`refusing to resolve doc content with invalid type: ${path} (${fileType})`);
+  }
+  const diskContent = await readTauriFile(path, fileType);
+  const draft = getTauriDocDraft(path, fileType);
+  if (draft === null) {
+    return { content: diskContent, diskContent, fromDraft: false, conflict: false };
+  }
+  if (isDocDraftStale(draft, diskContent)) {
+    clearTauriDocDraft(path, fileType);
+    // 内容已回退为磁盘版本，遗留的脏标记不再对应任何未保存修改，一并清除
+    clearTauriFileDirty(path, fileType);
+    return { content: diskContent, diskContent, fromDraft: false, conflict: true };
+  }
+  return { content: draft.content, diskContent, fromDraft: true, conflict: false };
 };
 
 export const getTauriBoardSnapshot = (path: string): string | null =>
@@ -822,7 +934,23 @@ export const flushAllTauriDirtyFiles = async (
       if (fileType === 'md' || fileType === 'table') {
         const draft = docDrafts[id];
         if (draft !== undefined) {
-          await writeTauriFile(path, draft, fileType);
+          // 退出前防覆盖：写盘前读一次磁盘比对草稿基线，磁盘已被应用外改动的
+          // 过期草稿绝不写回磁盘（避免用旧内容覆盖外部修改），清草稿清脏，
+          // 磁盘版本原样保留；读盘失败时保留草稿与脏标记，与写盘失败同等对待
+          let diskContent: string;
+          try {
+            diskContent = await readTauriFile(path, fileType);
+          } catch (error) {
+            console.error('Failed to read file before exit flush:', path, error);
+            continue;
+          }
+          if (isDocDraftStale(draft, diskContent)) {
+            delete docDrafts[id];
+            succeeded.add(id);
+            continue;
+          }
+          await writeTauriFile(path, draft.content, fileType);
+          notifyDocDiskSynced({ path, fileType, content: draft.content });
         }
       } else {
         const isCurrentBoard = path === state.currentFile && fileType === state.fileType;
@@ -852,5 +980,7 @@ export const flushAllTauriDirtyFiles = async (
       }
     }
     setState({ dirty });
+    // 退出前的清除立即持久化（草稿删除/脏标记清空不依赖 300ms 防抖）
+    flushPersistWorkbenchNow();
   }
 };
