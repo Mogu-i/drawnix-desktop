@@ -163,6 +163,7 @@ export interface Translations {
   'filePanel.newFolder': string;
   'filePanel.newSubFolder': string;
   'filePanel.newFolderPlaceholder': string;
+  'filePanel.newFileInFolder': string;
   'filePanel.folderLocation': string;
   'filePanel.defaultLocation': string;
   'filePanel.saveAs': string;

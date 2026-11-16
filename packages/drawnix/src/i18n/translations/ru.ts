@@ -160,6 +160,7 @@ const ruTranslations: Translations = {
   'filePanel.newFolder': 'Новая группа',
   'filePanel.newSubFolder': 'Новая подгруппа',
   'filePanel.newFolderPlaceholder': 'Название группы…',
+  'filePanel.newFileInFolder': 'Новый файл в этой группе',
   'filePanel.folderLocation': 'Папка',
   'filePanel.defaultLocation': 'Верхний уровень',
   'filePanel.saveAs': 'Сохранить как',

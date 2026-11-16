@@ -555,6 +555,38 @@
       padding: 0 2px;
     }
 
+    // 分组行「+」新建按钮：与「···」同款常驻低对比度，点击弹出文件类型菜单
+    .tauri-file-panel__folder-new {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: var(--border-radius-sm);
+      background-color: transparent;
+      color: var(--color-on-surface-muted);
+      opacity: 0.55;
+      cursor: pointer;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+
+      svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      &:hover {
+        opacity: 1;
+        background-color: var(--color-surface-high);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-highlight-color);
+      }
+    }
+
     // 常驻低对比度「···」操作按钮（C3）：点击打开行级右键菜单
     .tauri-file-panel__folder-more {
       flex-shrink: 0;

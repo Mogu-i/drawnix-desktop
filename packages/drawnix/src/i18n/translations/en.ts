@@ -157,6 +157,7 @@ const enTranslations: Translations = {
   'filePanel.newFolder': 'New group',
   'filePanel.newSubFolder': 'New subgroup',
   'filePanel.newFolderPlaceholder': 'Group name…',
+  'filePanel.newFileInFolder': 'New file in this group',
   'filePanel.folderLocation': 'Folder',
   'filePanel.defaultLocation': 'Top level',
   'filePanel.saveAs': 'Save as',

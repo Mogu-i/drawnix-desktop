@@ -159,6 +159,7 @@ const viTranslations: Translations = {
   'filePanel.newFolder': 'Nhóm mới',
   'filePanel.newSubFolder': 'Nhóm con mới',
   'filePanel.newFolderPlaceholder': 'Tên nhóm…',
+  'filePanel.newFileInFolder': 'Tạo tệp mới trong nhóm này',
   'filePanel.folderLocation': 'Thư mục',
   'filePanel.defaultLocation': 'Cấp trên cùng',
   'filePanel.saveAs': 'Lưu thành',

@@ -36,13 +36,15 @@ const clampTableSize = (value: number, fallback: number) => {
 
 // 新建文件弹窗：选择文件类型（白板/Markdown/表格）、输入文件名并选择所在目录后
 // 确认创建，由侧边栏文件面板与欢迎页共用；
-// presetType 非空时预选类型并隐藏类型字段（拆分按钮菜单进入，C2/C8）。
+// presetType 非空时预选类型并隐藏类型字段（拆分按钮菜单进入，C2/C8）；
+// initialDirPath 非空时预选所在分组（分组行新建入口进入，仍允许手动改选）。
 export const CreateFileDialog = ({
   open,
   onOpenChange,
   container,
   onCreate,
   presetType = null,
+  initialDirPath = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,6 +57,8 @@ export const CreateFileDialog = ({
   ) => void;
   /** 非空时预选文件类型并隐藏类型字段，标题随之变化 */
   presetType?: CreateDialogPreset;
+  /** 非空时预选所在分组 */
+  initialDirPath?: string | null;
 }) => {
   const { t } = useI18n();
   const [fileName, setFileName] = useState('');
@@ -79,7 +83,7 @@ export const CreateFileDialog = ({
     if (open) {
       setFileName('');
       setNameError(null);
-      setDirPath('');
+      setDirPath(initialDirPath ?? '');
       // 预选类型的 board 对应白板引擎的 drawnix
       setFileType(hasPreset ? (presetType === 'board' ? 'drawnix' : presetType) : 'drawnix');
       setTableRows(DEFAULT_TABLE_ROWS);
@@ -92,7 +96,7 @@ export const CreateFileDialog = ({
           });
       }
     }
-  }, [open, presetType, hasPreset]);
+  }, [open, presetType, hasPreset, initialDirPath]);
 
   const handleCreate = async () => {
     const name = normalizeTauriFileName(fileName);

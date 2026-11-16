@@ -158,6 +158,7 @@ const zhTranslations: Translations = {
   'filePanel.newFolder': '新建分组',
   'filePanel.newSubFolder': '新建子分组',
   'filePanel.newFolderPlaceholder': '输入分组名…',
+  'filePanel.newFileInFolder': '在此分组中新建文件',
   'filePanel.folderLocation': '所在文件夹',
   'filePanel.defaultLocation': '顶层',
   'filePanel.saveAs': '另存为',

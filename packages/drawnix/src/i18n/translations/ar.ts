@@ -158,6 +158,7 @@ const arTranslations: Translations = {
   'filePanel.newFolder': 'مجموعة جديدة',
   'filePanel.newSubFolder': 'مجموعة فرعية جديدة',
   'filePanel.newFolderPlaceholder': 'اسم المجموعة…',
+  'filePanel.newFileInFolder': 'ملف جديد في هذه المجموعة',
   'filePanel.folderLocation': 'المجلد',
   'filePanel.defaultLocation': 'المستوى الأعلى',
   'filePanel.saveAs': 'حفظ باسم',
