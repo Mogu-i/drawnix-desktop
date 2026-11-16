@@ -4,6 +4,7 @@ import {
   getViewportOrigination,
   idCreator,
   PlaitBoard,
+  PlaitHistoryBoard,
   Point,
   Transforms,
 } from '@plait/core';
@@ -52,7 +53,14 @@ export const insertCard = (board: PlaitBoard, center?: Point) => {
     [origin[0] + CARD_WIDTH / 2, origin[1] + CARD_HEIGHT / 2],
   ];
   const card = createCardElement(points);
-  Transforms.insertNode(board, card, [board.children.length]);
+  // 插入独立成批（G2）：不与之前的操作合并在同一撤销批次，撤销插入
+  // 只反转本次插入。插入时刻的 [children.length] 只在该瞬间有效（G3）：
+  // children 是数组而非 id 索引，异步/后续操作落地后长度可能变化，
+  // 之后对该卡片的任何 set_node 都必须用 PlaitBoard.findPath 重算 path
+  // （见 setCardData / syncFileRefCardPaths），禁止复用预计算下标
+  PlaitHistoryBoard.withNewBatch(board, () => {
+    Transforms.insertNode(board, card, [board.children.length]);
+  });
   // Mirror the native draw creation flow: cache the selection directly
   // instead of issuing a set_selection operation. The onChange handler of
   // that operation resolves element paths (findPath) before ListRender has
@@ -96,7 +104,10 @@ export const insertFileRefCard = (
     filePath,
     fileType,
   };
-  Transforms.insertNode(board, card, [board.children.length]);
+  // 与 insertCard 相同：插入独立成批 + 插入后 path 必须重算（G2/G3）
+  PlaitHistoryBoard.withNewBatch(board, () => {
+    Transforms.insertNode(board, card, [board.children.length]);
+  });
   // 与 insertCard 相同：直接缓存选中避免 set_selection 时机问题
   clearSelectedElement(board);
   addSelectedElement(board, card);

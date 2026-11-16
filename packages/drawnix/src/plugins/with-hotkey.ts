@@ -21,6 +21,36 @@ import { ArrowLineShape, BasicShapes } from '@plait/draw';
  */
 const isDocEditorOpen = (): boolean => !!document.querySelector('.doc-editor');
 
+/**
+ * 可编辑元素判定（G5）：contentEditable 元素自身或编辑宿主的后代、
+ * input/textarea。卡片内容编辑时事件 target 常是编辑宿主的子元素
+ * （真实浏览器里其 isContentEditable 为 true）；部分环境（jsdom 测试）
+ * 未实现该 getter，用 closest 按 contenteditable 属性兜底，两侧一致
+ */
+const isEditableElement = (element: HTMLElement): boolean =>
+  element.isContentEditable ||
+  !!element.closest('[contenteditable="true"], [contenteditable=""]') ||
+  element instanceof HTMLInputElement ||
+  element instanceof HTMLTextAreaElement;
+
+/**
+ * 撤销/重做是否应交给编辑器自身（G5）：焦点位于卡片内容 contentEditable、
+ * input/textarea 等可编辑区域，或文档编辑器覆盖层打开时，Ctrl+Z /
+ * Ctrl+Shift+Z 属于编辑器历史（contenteditable 原生撤销 / 文档历史栈），
+ * 白板不消费、不 preventDefault，保持浏览器默认行为。
+ * 与上方 globalKeyDown 的文档域守卫（isTypingNormal / isDocEditorOpen）同思路；
+ * use-plugin-event 已在文档编辑器打开时拦截 board.keyDown，这里补上
+ * 卡片 contentEditable 场景与纵深防御；工具栏按钮用 activeElement 做
+ * 同域判定（见 app-toolbar 的 isEditorFocused）。
+ */
+export const shouldLetEditorUndoRedo = (event: KeyboardEvent): boolean => {
+  if (isDocEditorOpen()) {
+    return true;
+  }
+  const target = event.target;
+  return target instanceof HTMLElement && isEditableElement(target);
+};
+
 export const buildDrawnixHotkeyPlugin = (
   updateAppState: (appState: Partial<DrawnixState>) => void
 ) => {
@@ -179,14 +209,20 @@ export const buildDrawnixHotkeyPlugin = (
 
     board.keyDown = (event: KeyboardEvent) => {
       if (isHotkey(['mod+z'], { byKey: true })(event)) {
-        board.undo();
-        event.preventDefault();
+        // 焦点在可编辑区域（卡片内容/输入框）或文档编辑器打开时让路（G5）：
+        // 不 preventDefault，contenteditable 的原生撤销继续生效
+        if (!shouldLetEditorUndoRedo(event)) {
+          board.undo();
+          event.preventDefault();
+        }
         return;
       }
 
       if (isHotkey(['mod+shift+z'], { byKey: true })(event)) {
-        board.redo();
-        event.preventDefault();
+        if (!shouldLetEditorUndoRedo(event)) {
+          board.redo();
+          event.preventDefault();
+        }
         return;
       }
 

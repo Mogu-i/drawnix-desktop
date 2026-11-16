@@ -68,6 +68,7 @@ import {
   clearBoardViewportsByPrefix,
   flushBoardSessionStateNow,
 } from '../../data/board-draft';
+import { clearBoardHistory } from '../../data/board-history';
 import { cancelTauriAutoSave, flushTauriAutoSaveNow } from '../../data/tauri-auto-save';
 import { fileSave } from '../../data/filesystem';
 import { MIME_TYPES } from '../../constants';
@@ -338,6 +339,9 @@ export const TauriFilePanel = () => {
   const clearAndLoad = (elements: PlaitElement[], viewport?: Viewport, theme?: PlaitTheme) => {
     suppressTauriDirty();
     board.children = elements;
+    // 与 use-tauri-file-actions 的 clearAndLoad 同理：整体替换 children 后
+    // 必须同步清空撤销栈，防止旧批次按数组下标回放删错新内容的元素（G1）
+    clearBoardHistory(board);
     board.viewport = viewport || { zoom: 1 };
     if (theme) {
       board.theme = theme;

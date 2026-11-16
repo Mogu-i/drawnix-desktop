@@ -26,6 +26,7 @@ import {
   getBoardViewport,
   isUsableViewport,
 } from '../data/board-draft';
+import { clearBoardHistory } from '../data/board-history';
 import { cancelTauriAutoSave, flushTauriAutoSaveNow } from '../data/tauri-auto-save';
 import { isDocDraftStale } from '../data/doc-draft';
 import { migrateLegacyBoardData } from '../plugins/card/with-card';
@@ -64,6 +65,11 @@ export const useTauriFileActions = () => {
       // Wrapper 的 [value] effect 会把恢复好的 viewport 再次 fit 覆盖；
       // 这里提前用同一数组，引用恒等后该 effect 自然跳过
       board.children = migrateLegacyBoardData(elements);
+      // 整体替换 children 不产生 operation，但撤销栈里可能残留上一个文件的
+      // 撤销批次；撤销回放按「逆操作 + 数组下标」定位元素，对旧批次撤销会把
+      // 新内容误删（图片/文件引用卡片消失且 redos 已清空无法重做）。
+      // 必须在替换后、任何后续 operation 之前同步清空（G1）
+      clearBoardHistory(board);
       board.viewport = viewport || { zoom: 1 };
       if (theme) {
         board.theme = theme;
