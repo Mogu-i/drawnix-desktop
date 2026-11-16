@@ -97,6 +97,7 @@ const ruTranslations: Translations = {
     'Не удалось создать папку. Возможно, папка с таким именем уже существует',
   'toast.tauriFile.draftRestored': 'Восстановлены несохранённые правки',
   'toast.tauriFile.draftCorrupted': 'Не удалось прочитать черновик; загружена версия с диска',
+  'toast.tauriFile.draftConflict': 'Файл был изменён вне приложения; загружена последняя версия с диска',
   'toast.imageUnsupported': 'Неподдерживаемый формат изображения, вставка невозможна',
   'toast.imageFetchFallback': 'Не удалось загрузить изображение со страницы; вставлено как текст',
   // Language
@@ -159,6 +160,7 @@ const ruTranslations: Translations = {
   'filePanel.newFolder': 'Новая группа',
   'filePanel.newSubFolder': 'Новая подгруппа',
   'filePanel.newFolderPlaceholder': 'Название группы…',
+  'filePanel.newFileInFolder': 'Новый файл в этой группе',
   'filePanel.folderLocation': 'Папка',
   'filePanel.defaultLocation': 'Верхний уровень',
   'filePanel.saveAs': 'Сохранить как',

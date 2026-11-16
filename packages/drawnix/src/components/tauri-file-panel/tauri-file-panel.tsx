@@ -34,6 +34,7 @@ import {
   buildEmptyDrawnixContent,
   buildEmptyMarkdownContent,
   buildEmptyTableContent,
+  closeTauriTab,
   createTauriFolder,
   deleteTauriFile,
   deleteTauriFolder,
@@ -68,12 +69,14 @@ import {
   clearBoardViewportsByPrefix,
   flushBoardSessionStateNow,
 } from '../../data/board-draft';
+import { clearBoardHistory } from '../../data/board-history';
 import { cancelTauriAutoSave, flushTauriAutoSaveNow } from '../../data/tauri-auto-save';
 import { fileSave } from '../../data/filesystem';
 import { MIME_TYPES } from '../../constants';
 import { saveAsPng, saveAsSvg } from '../../utils/image';
 import { Dialog, DialogContent } from '../dialog/dialog';
 import { useDrawnix } from '../../hooks/use-drawnix';
+import { useTauriFileActions } from '../../hooks/use-tauri-file-actions';
 import { useI18n } from '../../i18n';
 import { CreateFileDialog } from '../create-file-dialog/create-file-dialog';
 import { MoveEntryDialog } from '../move-entry-dialog/move-entry-dialog';
@@ -197,7 +200,10 @@ export const TauriFilePanel = () => {
   const listRender = useListRender();
   const { showToast } = useDrawnix();
   const { t } = useI18n();
-  const { currentFile, fileType: currentFileType, dirty } = useTauriFileState();
+  const { currentFile, fileType: currentFileType, dirty, openTabs } = useTauriFileState();
+  // 页签栏同源的页签打开入口：草稿 → 快照 → 磁盘的完整加载优先级，
+  // 删除文件/分组后切换相邻页签时复用（不重复实现快照与草稿恢复）
+  const { openFile } = useTauriFileActions();
   const { createDialog, sidebarOpen } = useWorkbenchUi();
   const [tree, setTree] = useState<TauriTreeResult>({
     dirs: [],
@@ -224,6 +230,8 @@ export const TauriFilePanel = () => {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  // 分组行「+」新建的类型菜单：记录打开菜单的分组路径（null 关闭，全局仅一个菜单开）
+  const [folderNewMenuDir, setFolderNewMenuDir] = useState<string | null>(null);
 
   // 新建菜单悬停展开：移出按钮/浮层后延迟收起（容纳移动途中的空隙），移入即取消
   const newMenuHoverCloseRef = useRef<number>();
@@ -338,6 +346,9 @@ export const TauriFilePanel = () => {
   const clearAndLoad = (elements: PlaitElement[], viewport?: Viewport, theme?: PlaitTheme) => {
     suppressTauriDirty();
     board.children = elements;
+    // 与 use-tauri-file-actions 的 clearAndLoad 同理：整体替换 children 后
+    // 必须同步清空撤销栈，防止旧批次按数组下标回放删错新内容的元素（G1）
+    clearBoardHistory(board);
     board.viewport = viewport || { zoom: 1 };
     if (theme) {
       board.theme = theme;
@@ -521,27 +532,36 @@ export const TauriFilePanel = () => {
     if (!target) {
       return;
     }
+    const fileType = asFileType(target.ext);
     // 同名不同类型文件路径相同，判别当前文档需连同文件类型
-    const isCurrentDoc = currentFile === target.path && currentFileType === asFileType(target.ext);
+    const isCurrentDoc = currentFile === target.path && currentFileType === fileType;
     try {
       // 当前打开的文档被删除时先屏蔽其自动保存，
       // 否则文档编辑器卸载时的回写会把刚删除的文件重新创建出来
       if (isCurrentDoc) {
-        suppressTauriFileSave(target.path, asFileType(target.ext));
+        suppressTauriFileSave(target.path, fileType);
       }
-      await deleteTauriFile(target.path, asFileType(target.ext));
+      await deleteTauriFile(target.path, fileType);
       // 文件已删除：清掉防抖中的自动保存任务（suppress 兜底跳过写盘，
       // cancel 负责清掉残留定时器；删除失败时不 cancel，resume 后任务仍能自动写盘）
-      cancelTauriAutoSave(target.path, asFileType(target.ext));
+      cancelTauriAutoSave(target.path, fileType);
       // 被删文件的草稿/视口一并清除：否则在原路径重建同名文件时会命中旧内容；
       // 草稿/视口只属于白板文件，删除文档（md/table）时不得误清同名白板的数据
-      if (asFileType(target.ext) === 'drawnix') {
+      if (fileType === 'drawnix') {
         void clearBoardDraft(target.path);
         clearBoardViewport(target.path);
       }
+      // 页签上有被删文件时关闭对应页签（页签未打开时 closeTauriTab 无副作用）；
+      // 被删的是当前文档时 closeTauriTab 已切到相邻页签，openFile 加载其内容
+      // （与页签栏收起同模式，不会误存被删文件的快照），无剩余页签回欢迎页
+      const nextTab = closeTauriTab(target.path, fileType);
       if (isCurrentDoc) {
-        setCurrentTauriFile(null);
-        clearAndLoad([]);
+        if (nextTab) {
+          void openFile(nextTab.path, nextTab.fileType);
+        } else {
+          setCurrentTauriFile(null);
+          clearAndLoad([]);
+        }
       }
       refreshTree();
       refreshTrash();
@@ -550,39 +570,72 @@ export const TauriFilePanel = () => {
     } catch (error) {
       // 删除失败：恢复被屏蔽的自动保存，避免编辑器后续修改丢失
       if (isCurrentDoc) {
-        resumeTauriFileSave(target.path, asFileType(target.ext));
+        resumeTauriFileSave(target.path, fileType);
       }
       console.error('Failed to delete file:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
     }
   };
 
-  // 删除分组：组内文件移入回收站，目录被移除
+  // 删除分组：目录被移除，组内文件与子文件夹提升到根目录（与确认弹窗文案一致）
   const handleDeleteFolder = async () => {
     const path = deleteFolderTarget;
     setDeleteFolderTarget(null);
     if (!path) {
       return;
     }
+    // 组内（含子级）已打开的页签全部随分组一起关闭；
+    // 同名不同类型文件按「路径:类型」复合身份逐个处理
+    const affectedTabs = openTabs.filter(
+      (tab) => tab.path === path || tab.path.startsWith(`${path}/`)
+    );
+    // 当前文档的页签最后关：先关其余页签（不会触发活动切换），最后关当前
+    // 页签时相邻回退目标必为组外页签，openFile 的 isSameTab 不变式才成立——
+    // 否则级联切换的中间落点页签会被误存被删文档内容的快照（污染无辜页签）
+    const currentTab = affectedTabs.find(
+      (tab) => tab.path === currentFile && tab.fileType === currentFileType
+    );
     try {
-      // 分组内包含当前打开的文件时，同样先关闭文档并屏蔽自动保存
-      if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
-        suppressTauriFileSave(currentFile, currentFileType);
-        setCurrentTauriFile(null);
-        clearAndLoad([]);
+      // 组内打开的文档先屏蔽自动保存回写，否则编辑器回写会把刚删除的
+      // 分组结构在旧位置重新创建出来（cancel 在删除成功后执行，
+      // 失败时防抖任务保留，resume 后仍能自动写盘）
+      for (const tab of affectedTabs) {
+        suppressTauriFileSave(tab.path, tab.fileType);
       }
       await deleteTauriFolder(path);
-      // 组内文件的草稿/视口一并清除（前缀为分组路径），原路径重建不误命中
+      for (const tab of affectedTabs) {
+        cancelTauriAutoSave(tab.path, tab.fileType);
+      }
+      // 组内旧路径的草稿/视口一并清除（前缀为分组路径），原路径重建不误命中；
+      // 提升到根目录的文件草稿按新路径重新积累
       void clearBoardDraftsByPrefix(`${path}/`);
       clearBoardViewportsByPrefix(`${path}/`);
+      // 先关非当前页签（不触发活动切换），最后关当前文档页签：closeTauriTab
+      // 已把活动页签切到相邻页签（此时必为组外页签），openFile 加载其内容；
+      // 无剩余页签时回到欢迎页
+      for (const tab of affectedTabs) {
+        if (currentTab && tab.path === currentTab.path && tab.fileType === currentTab.fileType) {
+          continue;
+        }
+        closeTauriTab(tab.path, tab.fileType);
+      }
+      if (currentTab) {
+        const nextTab = closeTauriTab(currentTab.path, currentTab.fileType);
+        if (nextTab) {
+          void openFile(nextTab.path, nextTab.fileType);
+        } else {
+          setCurrentTauriFile(null);
+          clearAndLoad([]);
+        }
+      }
       refreshTree();
       refreshTrash();
       // 广播变更：分组内被引用的文件卡片重新读取后进入“文件不存在”状态
       notifyTauriFilesChanged();
     } catch (error) {
       // 删除失败：恢复被屏蔽的自动保存
-      if (currentFile && (currentFile === path || currentFile.startsWith(`${path}/`))) {
-        resumeTauriFileSave(currentFile, currentFileType);
+      for (const tab of affectedTabs) {
+        resumeTauriFileSave(tab.path, tab.fileType);
       }
       console.error('Failed to delete folder:', error);
       showErrorToast(t('toast.tauriFile.deleteFailed'));
@@ -1205,6 +1258,66 @@ export const TauriFilePanel = () => {
             <span className="tauri-file-panel__folder-count" aria-hidden="true">
               {orderedFilesIn(dirPath).length}
             </span>
+            {/* 分组行「+」新建（与「···」同款常驻低对比度按钮）：点击弹出文件类型菜单，
+              选择后打开新建弹窗并预选所在分组，创建到对应分组中 */}
+            <Popover
+              placement="bottom-start"
+              open={folderNewMenuDir === dirPath}
+              onOpenChange={(open) => setFolderNewMenuDir(open ? dirPath : null)}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="tauri-file-panel__folder-new"
+                  title={t('filePanel.newFileInFolder')}
+                  aria-label={t('filePanel.newFileInFolder')}
+                  aria-haspopup="menu"
+                  onClick={() => setFolderNewMenuDir(dirPath)}
+                >
+                  {PlusIcon}
+                </button>
+              </PopoverTrigger>
+              {/* 菜单浮层 portal 到 .drawnix 根：与头部新建菜单同理，
+                插到 board container 会触发 plait 画布视口异常 */}
+              <PopoverContent container={document.querySelector('.drawnix')}>
+                <Menu
+                  onSelect={() => {
+                    setFolderNewMenuDir(null);
+                  }}
+                >
+                  <MenuItem
+                    icon={
+                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--board">
+                        {BoardIcon}
+                      </span>
+                    }
+                    onSelect={() => openCreateDialog('board', dirPath)}
+                  >
+                    {t('workbench.panel.newBoard')}
+                  </MenuItem>
+                  <MenuItem
+                    icon={
+                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--table">
+                        {TableIcon}
+                      </span>
+                    }
+                    onSelect={() => openCreateDialog('table', dirPath)}
+                  >
+                    {t('workbench.panel.newTable')}
+                  </MenuItem>
+                  <MenuItem
+                    icon={
+                      <span className="tauri-file-panel__menu-icon tauri-file-panel__menu-icon--md">
+                        {MdIcon}
+                      </span>
+                    }
+                    onSelect={() => openCreateDialog('md', dirPath)}
+                  >
+                    {t('workbench.panel.newMd')}
+                  </MenuItem>
+                </Menu>
+              </PopoverContent>
+            </Popover>
             <button
               type="button"
               className="tauri-file-panel__folder-more"
@@ -1624,6 +1737,7 @@ export const TauriFilePanel = () => {
           container={PlaitBoard.getBoardContainer(board)}
           onCreate={handleCreateFile}
           presetType={createDialog?.presetType ?? null}
+          initialDirPath={createDialog?.dirPath ?? null}
         ></CreateFileDialog>
         <MoveEntryDialog
           open={!!moveTarget}

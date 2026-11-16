@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
-import { getTauriDocDraft, readTauriFile } from '../../data/tauri-file';
+import {
+  TAURI_FILES_CHANGED_EVENT,
+  isTauriFileDirty,
+  resolveDocContent,
+} from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
+import { useDrawnix } from '../../hooks/use-drawnix';
 import { useDocAutoSave } from './use-doc-auto-save';
 import { useDocHistory } from './use-doc-history';
 import {
@@ -25,6 +30,7 @@ import './markdown-editor.scss';
 // 输入防抖后自动保存回对应文件
 export const MarkdownEditor = ({ path }: { path: string }) => {
   const { t } = useI18n();
+  const { showToast } = useDrawnix();
   const [text, setText] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [mode, setMode] = useState<MarkdownViewMode>(loadViewMode);
@@ -32,38 +38,62 @@ export const MarkdownEditor = ({ path }: { path: string }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // 工具栏操作后需要恢复的光标选区，待下一次文本渲染完成后再应用
   const pendingSelectionRef = useRef<[number, number] | null>(null);
+  // 加载序号：挂载加载与事件刷新并发时只让最后一次生效（通用竞态防护）
+  const loadSeqRef = useRef(0);
+  // 是否已成功加载：事件刷新守卫用（dataRef 的对应物）
+  const hasLoadedRef = useRef(false);
 
   const serialize = useCallback(() => textRef.current, []);
 
   const { scheduleSave, markLoaded } = useDocAutoSave(path, 'md', serialize);
 
-  useEffect(() => {
-    let cancelled = false;
+  // 加载与重载共用入口：resolveDocContent 统一决策「磁盘 vs 草稿」——
+  // 磁盘未被改动时恢复未保存草稿（与保存入口写盘的内容同源），
+  // 被应用外改动时过期草稿失效，回退磁盘版本并提示冲突
+  const loadDoc = useCallback(() => {
+    const seq = ++loadSeqRef.current;
+    hasLoadedRef.current = false;
     setLoadFailed(false);
     setText(null);
-    // 未保存草稿优先：切换页签/异常重启后重新挂载时磁盘仍是旧内容，
-    // 有草稿说明存在未保存修改，直接以草稿恢复（与保存入口写盘的内容同源），
-    // 与白板切页签时的快照恢复机制对称
-    const draft = getTauriDocDraft(path, 'md');
-    (draft !== null ? Promise.resolve(draft) : readTauriFile(path, 'md'))
-      .then((content) => {
-        if (cancelled) {
+    resolveDocContent(path, 'md')
+      .then((resolved) => {
+        if (seq !== loadSeqRef.current) {
           return;
         }
-        textRef.current = content;
-        setText(content);
-        markLoaded();
+        textRef.current = resolved.content;
+        setText(resolved.content);
+        hasLoadedRef.current = true;
+        // 基线永远是本次读到的磁盘原文（而非草稿内容），见 use-doc-auto-save
+        markLoaded(resolved.diskContent);
+        if (resolved.conflict) {
+          showToast({ message: t('toast.tauriFile.draftConflict') });
+        }
       })
       .catch((error) => {
         console.error('Failed to load markdown file:', error);
-        if (!cancelled) {
+        if (seq === loadSeqRef.current) {
           setLoadFailed(true);
         }
       });
-    return () => {
-      cancelled = true;
+  }, [path, markLoaded, showToast, t]);
+
+  useEffect(() => {
+    loadDoc();
+  }, [loadDoc]);
+
+  // 文件在应用内被其他入口改动（文件引用卡片写回、面板恢复等）后重载磁盘
+  // 最新内容；有未保存编辑时保持草稿显示，跳过本次重载不覆盖
+  useEffect(() => {
+    const handleFilesChanged = () => {
+      if (hasLoadedRef.current && !isTauriFileDirty(path, 'md')) {
+        loadDoc();
+      }
     };
-  }, [path, markLoaded]);
+    window.addEventListener(TAURI_FILES_CHANGED_EVENT, handleFilesChanged);
+    return () => {
+      window.removeEventListener(TAURI_FILES_CHANGED_EVENT, handleFilesChanged);
+    };
+  }, [path, loadDoc]);
 
   const history = useDocHistory<string>();
 

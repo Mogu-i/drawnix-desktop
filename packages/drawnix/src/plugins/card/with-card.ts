@@ -13,6 +13,7 @@ import { isGeometryIncludeText, PlaitDrawElement } from '@plait/draw';
 import { CardComponent } from './card.component';
 import { Card, CARD_GEOMETRY_SHAPE, CARD_GEOMETRY_TYPE, CARD_TYPE } from './type';
 import { insertFileRefCard, openFileRefCardEditor } from './transforms';
+import { clearBoardHistory } from '../../data/board-history';
 
 // tolerance for clicking a card border, in board units
 const CARD_HIT_TOLERANCE = 4;
@@ -87,6 +88,9 @@ export const withCard = (board: PlaitBoard) => {
   const { drawElement, isHit, isRectangleHit, keyDown, dblClick, drop } = board;
 
   board.children = migrateLegacyBoardData(board.children);
+  // 迁移整体替换了 children：同步清空撤销栈，与各处 clearAndLoad 的
+  // 清空约定一致。初始化时序上 history 通常为空，此处属防御性清空（G1）
+  clearBoardHistory(board);
 
   board.drawElement = (context: PlaitPluginElementContext) => {
     if (Card.isCard(context.element)) {

@@ -97,6 +97,7 @@ const viTranslations: Translations = {
     'Không thể tạo thư mục, có thể đã tồn tại thư mục trùng tên',
   'toast.tauriFile.draftRestored': 'Đã khôi phục các chỉnh sửa chưa lưu',
   'toast.tauriFile.draftCorrupted': 'Không thể đọc bản nháp; đã tải phiên bản trên đĩa',
+  'toast.tauriFile.draftConflict': 'Tệp đã bị sửa ngoài ứng dụng; đã tải phiên bản mới nhất từ đĩa',
   'toast.imageUnsupported': 'Định dạng ảnh không được hỗ trợ, không thể dán',
   'toast.imageFetchFallback': 'Không thể tải ảnh từ trang web; đã dán dưới dạng văn bản',
   // Language
@@ -158,6 +159,7 @@ const viTranslations: Translations = {
   'filePanel.newFolder': 'Nhóm mới',
   'filePanel.newSubFolder': 'Nhóm con mới',
   'filePanel.newFolderPlaceholder': 'Tên nhóm…',
+  'filePanel.newFileInFolder': 'Tạo tệp mới trong nhóm này',
   'filePanel.folderLocation': 'Thư mục',
   'filePanel.defaultLocation': 'Cấp trên cùng',
   'filePanel.saveAs': 'Lưu thành',

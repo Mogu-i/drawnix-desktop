@@ -100,6 +100,7 @@ export interface Translations {
   'toast.tauriFile.createFolderFailed': string;
   'toast.tauriFile.draftRestored': string;
   'toast.tauriFile.draftCorrupted': string;
+  'toast.tauriFile.draftConflict': string;
   'toast.imageUnsupported': string;
   'toast.imageFetchFallback': string;
 
@@ -162,6 +163,7 @@ export interface Translations {
   'filePanel.newFolder': string;
   'filePanel.newSubFolder': string;
   'filePanel.newFolderPlaceholder': string;
+  'filePanel.newFileInFolder': string;
   'filePanel.folderLocation': string;
   'filePanel.defaultLocation': string;
   'filePanel.saveAs': string;

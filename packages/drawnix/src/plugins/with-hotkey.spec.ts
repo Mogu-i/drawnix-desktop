@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOARD_TO_MOVING_POINT_IN_BOARD, PlaitPointerType } from '@plait/core';
+import {
+  BOARD_TO_MOVING_POINT_IN_BOARD,
+  PlaitPointerType,
+  Transforms,
+  withHistory,
+} from '@plait/core';
 import type { PlaitPlugin } from '@plait/core';
 
 // 保存相关模块全部替换为 spy：既隔离 DOM/文件系统副作用，也能验证
@@ -194,5 +199,122 @@ describe('drawnix hotkey plugin save & doc-editor guard', () => {
     pressKey('u', 85, { ctrlKey: true });
 
     expect(mocks.addImage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('drawnix hotkey plugin undo/redo editor guard（G5）', () => {
+  let fixture: DrawnixTestingBoardFixture | undefined;
+
+  afterEach(() => {
+    docOverlayRef?.remove();
+    docOverlayRef = null;
+    if (fixture) {
+      fixture.destroy();
+      fixture = undefined;
+    }
+  });
+
+  /** 撤销/重做守卫需要真实 history 栈：挂 withHistory，比全局守卫用例多一层 */
+  const createUndoFixture = () => {
+    fixture = setupDrawnixTestingBoard([withHistory, buildDrawnixHotkeyPlugin(vi.fn())], []);
+    // 造一次可撤销操作（入撤销栈）
+    Transforms.insertNode(
+      fixture.board,
+      {
+        id: 'geo-1',
+        type: 'geometry',
+        shape: 'rectangle',
+        points: [
+          [0, 0],
+          [10, 10],
+        ],
+      },
+      [0]
+    );
+    return fixture.board;
+  };
+
+  const pressUndo = (target?: HTMLElement) => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'z',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    if (target) {
+      Object.defineProperty(event, 'target', { value: target, configurable: true });
+    }
+    fixture!.board.keyDown(event);
+    return event;
+  };
+
+  const pressRedo = (target?: HTMLElement) => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'Z',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    if (target) {
+      Object.defineProperty(event, 'target', { value: target, configurable: true });
+    }
+    fixture!.board.keyDown(event);
+    return event;
+  };
+
+  it('runs board.undo for plain mod+z on the canvas', () => {
+    const board = createUndoFixture();
+    expect(board.children).toHaveLength(1);
+
+    const event = pressUndo();
+
+    expect(board.children).toHaveLength(0);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('leaves mod+z to a focused card contentEditable (no board undo, no preventDefault)', () => {
+    const board = createUndoFixture();
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    document.body.appendChild(editable);
+
+    const event = pressUndo(editable);
+
+    // 白板撤销未触发，原生撤销未被吞掉
+    expect(board.children).toHaveLength(1);
+    expect(event.defaultPrevented).toBe(false);
+    editable.remove();
+  });
+
+  it('leaves mod+z to the doc editor history while the overlay is open', () => {
+    const board = createUndoFixture();
+    openDocEditorOverlay();
+
+    const event = pressUndo();
+
+    expect(board.children).toHaveLength(1);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('runs board.redo for plain mod+shift+z but not inside a contentEditable', () => {
+    const board = createUndoFixture();
+    pressUndo();
+    expect(board.children).toHaveLength(0);
+
+    // 画布上：重做真实生效
+    const redoEvent = pressRedo();
+    expect(board.children).toHaveLength(1);
+    expect(redoEvent.defaultPrevented).toBe(true);
+
+    pressUndo();
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    document.body.appendChild(editable);
+    const guardedRedo = pressRedo(editable);
+    // contentEditable 持焦点：重做让路
+    expect(board.children).toHaveLength(0);
+    expect(guardedRedo.defaultPrevented).toBe(false);
+    editable.remove();
   });
 });

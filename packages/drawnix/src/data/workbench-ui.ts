@@ -8,8 +8,9 @@ import { useSyncExternalStore } from 'react';
 export type CreateDialogPreset = 'board' | 'table' | 'md' | 'folder' | null;
 
 export type WorkbenchUiState = {
-  /** 新建弹窗：null 关闭；presetType 非空时预选该类型并隐藏类型字段 */
-  createDialog: { presetType: CreateDialogPreset } | null;
+  /** 新建弹窗：null 关闭；presetType 非空时预选该类型并隐藏类型字段；
+   *  dirPath 非空时预选所在分组（分组行新建入口进入，仍允许手动改选） */
+  createDialog: { presetType: CreateDialogPreset; dirPath?: string | null } | null;
   /** 窄屏文件面板抽屉是否展开（桌面布局恒为 false） */
   sidebarOpen: boolean;
   /** 退出确认弹窗是否打开（窗口关闭按钮 / Alt+F4 触发） */
@@ -46,9 +47,13 @@ export const useWorkbenchUi = (): WorkbenchUiState => {
   return useSyncExternalStore(subscribe, getWorkbenchUiState);
 };
 
-/** 打开新建弹窗；presetType 非空时预选类型（不再要求用户二次选择） */
-export const openCreateDialog = (presetType: CreateDialogPreset = null) => {
-  setState({ createDialog: { presetType } });
+/** 打开新建弹窗；presetType 非空时预选类型（不再要求用户二次选择），
+ *  dirPath 非空时预选所在分组 */
+export const openCreateDialog = (
+  presetType: CreateDialogPreset = null,
+  dirPath?: string | null
+) => {
+  setState({ createDialog: { presetType, dirPath: dirPath ?? null } });
 };
 
 export const closeCreateDialog = () => {

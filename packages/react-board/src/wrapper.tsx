@@ -197,6 +197,13 @@ export const Wrapper: React.FC<WrapperProps> = ({
 
     if (value !== context.board.children && !FLUSHING.get(board)) {
       board.children = value;
+      // 受控回灌同样整体替换 children：撤销栈里残留的旧批次按「逆操作 +
+      // 数组下标」回放会命中错误元素（图片/卡片连坐删除且无法重做），
+      // 必须同步清空。与 @drawnix/drawnix 的 data/board-history.ts 同一
+      // 约定（本包不能反向依赖 drawnix，故就地实现：原地 splice 清空，
+      // 不整体替换 history 对象）（G1）
+      board.history.undos.splice(0);
+      board.history.redos.splice(0);
       if (theme) {
         board.theme = theme;
       }

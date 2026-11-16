@@ -2,6 +2,7 @@ import { ExportImageIcon, GithubIcon, OpenFileIcon, SaveFileIcon, TrashIcon } fr
 import { useBoard, useListRender } from '@plait-board/react-board';
 import { BoardTransforms, PlaitBoard, PlaitElement, PlaitTheme, Viewport } from '@plait/core';
 import { loadFromJSON, saveAsJSON, saveJSON } from '../../../data/json';
+import { clearBoardHistory } from '../../../data/board-history';
 import MenuItem from '../../menu/menu-item';
 import MenuItemLink from '../../menu/menu-item-link';
 import { saveAsPng, saveAsSvg } from '../../../utils/image';
@@ -102,6 +103,9 @@ export const OpenFile = () => {
   const { t } = useI18n();
   const clearAndLoad = (value: PlaitElement[], viewport?: Viewport, theme?: PlaitTheme) => {
     board.children = value;
+    // 整体替换 children 后同步清空撤销栈：旧批次按数组下标回放会删错
+    // 新内容的元素（图片/卡片连坐消失），与各处 clearAndLoad 约定一致（G1）
+    clearBoardHistory(board);
     board.viewport = viewport || { zoom: 1 };
     if (theme) {
       board.theme = theme;

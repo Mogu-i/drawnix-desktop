@@ -3,10 +3,11 @@ import classNames from 'classnames';
 import {
   TableFileData,
   TableCellData,
+  TAURI_FILES_CHANGED_EVENT,
   buildEmptyTableCell,
-  getTauriDocDraft,
+  isTauriFileDirty,
   parseTableFileContent,
-  readTauriFile,
+  resolveDocContent,
 } from '../../data/tauri-file';
 import { useI18n } from '../../i18n';
 import type { Translations } from '../../i18n/types';
@@ -158,6 +159,8 @@ export const TableEditor = ({ path }: { path: string }) => {
   // 撑高时浏览器会把行实际渲染得更高，手柄必须按 DOM 实测边界定位才会与边框对齐
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [measured, setMeasured] = useState<{ rows: number[]; cols: number[] } | null>(null);
+  // 加载序号：挂载加载与事件刷新并发时只让最后一次生效（通用竞态防护）
+  const loadSeqRef = useRef(0);
 
   const serialize = useCallback(
     () => (dataRef.current ? JSON.stringify(dataRef.current, null, 2) : null),
@@ -166,37 +169,55 @@ export const TableEditor = ({ path }: { path: string }) => {
 
   const { scheduleSave, markLoaded } = useDocAutoSave(path, 'table', serialize);
 
-  useEffect(() => {
-    let cancelled = false;
+  // 加载与重载共用入口：resolveDocContent 统一决策「磁盘 vs 草稿」——
+  // 磁盘未被改动时恢复未保存草稿（与保存入口写盘的内容同源），
+  // 被应用外改动时过期草稿失效，回退磁盘版本并提示冲突
+  const loadDoc = useCallback(() => {
+    const seq = ++loadSeqRef.current;
     setLoadFailed(false);
     setData(null);
     dataRef.current = null;
     setSel(null);
     setEditing(null);
-    // 未保存草稿优先：切换页签/异常重启后重新挂载时磁盘仍是旧内容，
-    // 有草稿说明存在未保存修改，直接以草稿恢复（与保存入口写盘的内容同源），
-    // 与白板切页签时的快照恢复机制对称
-    const draft = getTauriDocDraft(path, 'table');
-    (draft !== null ? Promise.resolve(draft) : readTauriFile(path, 'table'))
-      .then((content) => {
-        if (cancelled) {
+    resolveDocContent(path, 'table')
+      .then((resolved) => {
+        if (seq !== loadSeqRef.current) {
           return;
         }
-        const parsed = parseTableFileContent(content);
+        const parsed = parseTableFileContent(resolved.content);
         dataRef.current = parsed;
         setData(parsed);
-        markLoaded();
+        // 基线永远是本次读到的磁盘原文（而非草稿内容），见 use-doc-auto-save
+        markLoaded(resolved.diskContent);
+        if (resolved.conflict) {
+          showToast({ message: t('toast.tauriFile.draftConflict') });
+        }
       })
       .catch((error) => {
         console.error('Failed to load table file:', error);
-        if (!cancelled) {
+        if (seq === loadSeqRef.current) {
           setLoadFailed(true);
         }
       });
-    return () => {
-      cancelled = true;
+  }, [path, markLoaded, showToast, t]);
+
+  useEffect(() => {
+    loadDoc();
+  }, [loadDoc]);
+
+  // 文件在应用内被其他入口改动（文件引用卡片写回、面板恢复等）后重载磁盘
+  // 最新内容；有未保存编辑时保持草稿显示，跳过本次重载不覆盖
+  useEffect(() => {
+    const handleFilesChanged = () => {
+      if (dataRef.current !== null && !isTauriFileDirty(path, 'table')) {
+        loadDoc();
+      }
     };
-  }, [path, markLoaded]);
+    window.addEventListener(TAURI_FILES_CHANGED_EVENT, handleFilesChanged);
+    return () => {
+      window.removeEventListener(TAURI_FILES_CHANGED_EVENT, handleFilesChanged);
+    };
+  }, [path, loadDoc]);
 
   const history = useDocHistory<TableFileData>();
 
